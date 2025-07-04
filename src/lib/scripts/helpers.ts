@@ -12,6 +12,15 @@ export const isToday = (timestamp: number) => {
 };
 
 /**
+ * turn firebase seconds timestamp into a readable format
+ * @param timestamp the firebase seconds
+ * @returns a readable time string
+ */
+export const toHumanDate = (timestamp: number) => {
+	return new Date(timestamp * 1000).toDateString();
+};
+
+/**
  * determine the user's age factor
  * @param userGender male or female
  * @returns the age factor number
