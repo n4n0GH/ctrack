@@ -1,0 +1,253 @@
+{
+	"settings": {
+		"user": {
+			"starting_weight": 112,
+			"height": 178,
+			"age": 38,
+			"activity_factor": 1.2,
+			"gender": "male",
+			"deficit": 700
+		}
+	},
+	"weight": [
+		{
+			"weight": 112,
+			"unit": "kg",
+			"date": ""
+		},
+		{
+			"weight": 110,
+			"unit": "kg",
+			"date": ""
+		},
+		{
+			"weight": 108,
+			"unit": "kg",
+			"date": ""
+		},
+		{
+			"weight": 106,
+			"unit": "kg",
+			"date": "2025-06-24T07:13:22.614Z"
+		},
+		{
+			"weight": 105,
+			"unit": "kg",
+			"date": "2025-06-26T07:13:22.614Z"
+		},
+		{
+			"weight": 104,
+			"unit": "kg",
+			"date": "2025-07-01T14:30:22.614Z"
+		}
+	],
+	"calories": {
+		"intake": [
+			{
+				"name": "Pasta mit Lachs",
+				"energy": 1500,
+				"unit": "kcal",
+				"date": "2025-06-24T09:30:00.000Z"
+			},
+			{
+				"name": "Burger King",
+				"energy": 1506.3,
+				"unit": "kcal",
+				"date": "2025-06-25T11:34:00.000Z"
+			},
+			{
+				"name": "Bernstein Weizen Alkoholfrei",
+				"energy": 145,
+				"unit": "kcal",
+				"date": "2025-06-25T17:43:00.000Z"
+			},
+			{
+				"name": "Banane",
+				"energy": 95,
+				"unit": "kcal",
+				"date": "2025-06-26T07:13:22.614Z"
+			},
+			{
+				"name": "Pasta mit Pesto Genovese",
+				"energy": 1340,
+				"unit": "kcal",
+				"date": "2025-06-26T09:45:43.399Z"
+			},
+			{
+				"name": "Faxe Dose",
+				"energy": 420,
+				"unit": "kcal",
+				"date": "2025-06-26T17:53:12.068Z"
+			},
+			{
+				"name": "Turkey Jerky",
+				"energy": 112,
+				"unit": "kcal",
+				"date": "2025-06-26T18:38:13.322Z"
+			},
+			{
+				"name": "Brötchen mit Butter",
+				"energy": 205,
+				"unit": "kcal",
+				"date": "2025-06-27T06:30:13.322Z"
+			},
+			{
+				"name": "Dominos Medium Caprese",
+				"energy": 900,
+				"unit": "kcal",
+				"date": "2025-06-27T10:38:13.322Z"
+			},
+			{
+				"name": "Pasta mit Pesto Genovese reste",
+				"energy": 250,
+				"unit": "kcal",
+				"date": "2025-06-27T16:38:13.322Z"
+			},
+			{
+				"name": "Störtebeker Kellerbier",
+				"energy": 200,
+				"unit": "kcal",
+				"date": "2025-06-27T17:11:25.271Z"
+			},
+			{
+				"name": "Störtebeker Kellerbier",
+				"energy": 200,
+				"unit": "kcal",
+				"date": "2025-06-27T17:31:25.271Z"
+			},
+			{
+				"name": "Pizza Funghi Stücke",
+				"energy": 250,
+				"unit": "kcal",
+				"date": "2025-06-27T18:00:25.271Z"
+			},
+			{
+				"name": "Banane",
+				"energy": 95,
+				"unit": "kcal",
+				"date": "2025-06-28T07:40:25.271Z"
+			},
+			{
+				"name": "Halbes Wiener Würstchen",
+				"energy": 57.5,
+				"unit": "kcal",
+				"date": "2025-06-28T09:00:25.271Z"
+			},
+			{
+				"name": "Monster Ultra Red",
+				"energy": 13,
+				"unit": "kcal",
+				"date": "2025-06-28T11:50:25.271Z"
+			},
+			{
+				"name": "Pasta Bolognese",
+				"energy": 985.5,
+				"unit": "kcal",
+				"date": "2025-06-28T12:10:25.271Z"
+			},
+			{
+				"name": "Störtebeker Kellerbier",
+				"energy": 200,
+				"unit": "kcal",
+				"date": "2025-06-28T17:31:25.271Z"
+			},
+			{
+				"name": "Störtebeker Kellerbier",
+				"energy": 200,
+				"unit": "kcal",
+				"date": "2025-06-28T18:31:25.271Z"
+			},
+			{
+				"name": "Störtebeker Kellerbier",
+				"energy": 200,
+				"unit": "kcal",
+				"date": "2025-06-28T18:47:25.271Z"
+			},
+			{
+				"name": "Störtebeker Kellerbier",
+				"energy": 200,
+				"unit": "kcal",
+				"date": "2025-06-28T19:47:25.271Z"
+			},
+			{
+				"name": "Banane",
+				"energy": 95,
+				"unit": "kcal",
+				"date": "2025-06-29T09:00:25.271Z"
+			},
+			{
+				"name": "Pasta Bolognese",
+				"energy": 1541,
+				"unit": "kcal",
+				"date": "2025-06-29T12:20:25.271Z"
+			},
+			{
+				"name": "Monster Ultra Peach",
+				"energy": 13,
+				"unit": "kcal",
+				"date": "2025-06-29T17:20:25.271Z"
+			},
+			{
+				"name": "Banane",
+				"energy": 95,
+				"unit": "kcal",
+				"date": "2025-06-30T06:10:25.271Z"
+			},
+			{
+				"name": "3 Burger",
+				"energy": 1772,
+				"unit": "kcal",
+				"date": "2025-06-30T10:10:25.271Z"
+			},
+			{
+				"name": "Bernstein Weizen Alkoholfrei",
+				"energy": 145,
+				"unit": "kcal",
+				"date": "2025-06-30T17:00:00.000Z"
+			},
+			{
+				"name": "2 McMuffin Bacon & Egg",
+				"energy": 594,
+				"unit": "kcal",
+				"date": "2025-07-01T08:00:00.000Z"
+			},
+			{
+				"name": "Long Chicken m. Käse + 6er Chilli Cheese Nuggets",
+				"energy": 903,
+				"unit": "kcal",
+				"date": "2025-07-01T12:30:00.000Z"
+			},
+			{
+				"name": "Monster Ultra Gold",
+				"energy": 10,
+				"unit": "kcal",
+				"date": "2025-07-01T14:52:00.000Z"
+			},
+			{
+				"name": "Bernstein Weizen Alkoholfrei",
+				"energy": 145,
+				"unit": "kcal",
+				"date": "2025-07-01T18:30:00.000Z"
+			},
+			{
+				"name": "Burger King + Energy",
+				"energy": 1380.3,
+				"unit": "kcal",
+				"date": "2025-07-02T10:30:00.000Z"
+			},
+			{
+				"name": "Faxe Dose",
+				"energy": 420,
+				"unit": "kcal",
+				"date": "2025-07-02T17:20:12.068Z"
+			},
+			{
+				"name": "Pasta mit Pesto Genovese",
+				"energy": 1340,
+				"unit": "kcal",
+				"date": "2025-07-03T09:30:43.399Z"
+			}
+		],
+		"burned": []
+	}
+}

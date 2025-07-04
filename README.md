@@ -1,38 +1,18 @@
-# sv
+# cTrack
+A simple energy and weight tracker. No database required.
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+## Tracking
+### Weight
+Enter your starting weight, a date and then add more datapoints as your weight changes. Note: requires you to actually get a scale IRL.
 
-## Creating a project
+### Food
+You enter a meal and it's approximate or exact energy count. Each new item will be stored locally so you can reference it quicker next time.
 
-If you're seeing this, you've probably already done this step. Congrats!
+### Data
+At the top of the application is a widget to view your estimated daily energy consumption, today's energy intake as well as possible extra consumption through exercising, your starting weight as well as your latest weight.
 
-```bash
-# create a new project in the current directory
-npx sv create
-
-# create a new project in my-app
-npx sv create my-app
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```bash
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```bash
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+## TODO
+- [ ] Add OpenFoodFacts API (https://openfoodfacts.github.io/openfoodfacts-server/api/)
+- [ ] Add option to sync data
+- [ ] Add option for auto-backup via JSON to local filesystem
+- [ ] Add caloric base requirement calculation
