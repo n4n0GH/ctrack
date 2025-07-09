@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs } from 'firebase/firestore/lite';
+import { getFirestore, collection, getDocs, addDoc, Timestamp } from 'firebase/firestore/lite';
 import {
 	PUBLIC_API_KEY,
 	PUBLIC_AUTH_DOMAIN,
@@ -9,7 +9,7 @@ import {
 	PUBLIC_APP_ID
 } from '$env/static/public';
 
-import type { CalorieSelector } from '$lib/data/types';
+import type { CalorieSelector, EnergyItem } from '$lib/data/types';
 
 const firebaseConfig = {
 	apiKey: PUBLIC_API_KEY,
@@ -52,4 +52,34 @@ export const getCalories = async (path: CalorieSelector) => {
 	const caloriesCol = collection(db, path);
 	const calories = await getDocs(caloriesCol);
 	return calories.docs.map((doc) => doc.data());
+};
+
+/**
+ * adds a new document to a calorie collection
+ * @param path name of the calorie collection
+ * @param calorieItem object of type EnergyItem to add to the collection
+ */
+export const addCalories = async (path: CalorieSelector, calorieItem: EnergyItem) => {
+	let updateSuccess = false;
+	await addDoc(collection(db, path), calorieItem)
+		.then(() => {
+			updateSuccess = true;
+		})
+		.catch((e) => {
+			console.log(e);
+			updateSuccess = false;
+		});
+	return {
+		success: updateSuccess,
+		data: calorieItem
+	};
+};
+
+/**
+ * Exposes Firebase timestamping util to the application
+ * @param stamp UNIX millisecond timestamp
+ * @returns Timestamp object with seconds and nanoseconds
+ */
+export const getFbTime = (stamp: number) => {
+	return Timestamp.fromMillis(stamp);
 };

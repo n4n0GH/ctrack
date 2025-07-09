@@ -1,5 +1,5 @@
 <script lang="ts">
-	let { children, title, clickable }: { children: any; title?: any; clickable?: boolean } =
+	let { children, title, clickable }: { children?: any; title?: any; clickable?: boolean } =
 		$props();
 </script>
 

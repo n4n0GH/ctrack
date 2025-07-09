@@ -75,7 +75,5 @@
 			</div>
 		</div>
 	</Container>
-	<Container>
-		<p>Timm ludschd fühse</p>
-	</Container>
+	<Container></Container>
 </div>

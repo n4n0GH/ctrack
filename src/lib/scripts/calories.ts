@@ -32,12 +32,14 @@ export const calorieGoal = (
  * @returns the amount of calories taken in "today"
  */
 export const usedCalories = (foodData: EnergyItem[] | DocumentData[]) => {
-	return foodData
-		.map((item) => {
-			const sameDay = isToday(item.date.seconds);
-			return sameDay ? item.energyValue : 0;
-		})
-		.reduce((a, b) => a + b, 0);
+	return Math.floor(
+		foodData
+			.map((item) => {
+				const sameDay = isToday(item.date.seconds);
+				return sameDay ? item.energyValue : 0;
+			})
+			.reduce((a, b) => a + b, 0)
+	);
 };
 
 /**
