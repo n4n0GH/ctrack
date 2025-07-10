@@ -5,7 +5,11 @@
 	let calorieName = $state('');
 	let calorieValue = $state(0);
 	let date = $state(getIsoDate.split('T')[0]);
-	let time = $state(new Date().getHours() + ':' + String(new Date().getMinutes()).padStart(2, '0'));
+	let time = $state(
+		String(new Date().getHours()).padStart(2, '0') +
+			':' +
+			String(new Date().getMinutes()).padStart(2, '0')
+	);
 
 	const getStampedDate = () => {
 		return new Date(date + 'T' + time).getTime();
