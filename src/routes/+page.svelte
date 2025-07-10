@@ -2,22 +2,12 @@
 	import Container from '$lib/components/Container.svelte';
 	import RadialProgress from '$lib/components/RadialProgress.svelte';
 	import { getSettings } from '$lib/state/settings.svelte';
-	import { getUserWeights } from '$lib/state/weight.svelte';
 	import { getUserCalories } from '$lib/state/calories.svelte';
 	import { getAgeFactor } from '$lib/scripts/helpers';
 	import { calorieGoal, usedCalories, deficitReduction } from '$lib/scripts/calories';
 
 	let settings = getSettings();
 	let calories = getUserCalories();
-	let weights = getUserWeights();
-
-	const addCalorieData = () => {
-		console.log('calorie');
-	};
-
-	const addWeightData = () => {
-		console.log('weight');
-	};
 
 	const ageFactor = getAgeFactor(settings.gender);
 
@@ -30,8 +20,10 @@
 		settings.deficit
 	);
 	let used = usedCalories(calories.intake);
-	let usedCaloriesPercentage = (used / goal) * 100;
-	let dailyDeficit = settings.deficit - deficitReduction(goal, used, settings.deficit);
+	let burned = usedCalories(calories.burned);
+	let delta = used - burned;
+	let usedCaloriesPercentage = (delta / goal) * 100;
+	let dailyDeficit = settings.deficit - deficitReduction(goal, delta, settings.deficit);
 	let deficitPercentage = (dailyDeficit / settings.deficit) * 100;
 
 	let calorieColor =
@@ -47,11 +39,11 @@
 
 <div class="flex flex-wrap">
 	<Container>
-		<div role="none" class="stats" onclick={() => addCalorieData()}>
+		<div role="none" class="stats">
 			<div class="stat">
 				<p class="mb-4 text-center">Target</p>
 				<RadialProgress color={calorieColor} percentage={usedCaloriesPercentage} />
-				<p class="mt-4 text-center">{used}/{goal} kcal</p>
+				<p class="mt-4 text-center">{delta}/{goal} kcal</p>
 			</div>
 			<div class="stat">
 				<p class="mb-4 text-center">Deficit</p>
@@ -61,7 +53,7 @@
 		</div>
 	</Container>
 	<Container>
-		<div class="stats" role="none" onclick={() => addWeightData()}>
+		<div class="stats" role="none">
 			<div class="stat items-end font-mono">
 				<div class="stat-desc text-right">ATH: {settings.highestWeight}</div>
 				<div class="stat-desc text-right">ATL: {settings.lowestWeight}</div>

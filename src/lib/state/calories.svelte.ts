@@ -18,7 +18,7 @@ export const updateIntake = (newCalories: EnergyItem) => {
 };
 
 export const updateBurn = (newCalories: EnergyItem) => {
-	calories.intake.push(newCalories);
+	calories.burned.push(newCalories);
 };
 
 export const initCalories = (dataset: {

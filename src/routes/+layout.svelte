@@ -11,7 +11,9 @@
 	};
 </script>
 
-{@render children()}
+<div class="mb-20">
+	{@render children()}
+</div>
 <div class="dock dock-lg">
 	<button onclick={() => goto('/')} class:dock-active={isPath('/')}>
 		<svg

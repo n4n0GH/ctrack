@@ -1,14 +1,17 @@
 <script lang="ts">
 	import { getFbTime, addCalories } from '$lib/middleware/firebase';
 	import { updateIntake, updateBurn } from '$lib/state/calories.svelte';
+
+	const timePadding = (time: number) => {
+		return String(time).padStart(2, '0');
+	};
+
 	let getIsoDate = new Date().toISOString();
 	let calorieName = $state('');
 	let calorieValue = $state(0);
 	let date = $state(getIsoDate.split('T')[0]);
 	let time = $state(
-		String(new Date().getHours()).padStart(2, '0') +
-			':' +
-			String(new Date().getMinutes()).padStart(2, '0')
+		timePadding(new Date().getHours()) + ':' + timePadding(new Date().getMinutes())
 	);
 
 	const getStampedDate = () => {
@@ -77,5 +80,26 @@
 		class="tab border-base-300 bg-base-100"
 		aria-label="Burned"
 	/>
-	<div class="tab-content border-base-300 bg-base-100 p-10">Burned calories input</div>
+	<div class="tab-content border-base-300 bg-base-100 p-10">
+		<label class="input">
+			Activity
+			<input type="text" class="grow" placeholder="Cycling" bind:value={calorieName} />
+		</label>
+		<label class="input">
+			Calories
+			<input type="number" class="grow" placeholder="9001" bind:value={calorieValue} />
+			<span class="badge badge-neutral badge-xs">kcal</span>
+		</label>
+		<label class="input">
+			Date
+			<input type="date" class="input" bind:value={date} />
+		</label>
+		<label class="input">
+			Time
+			<input type="time" class="input" bind:value={time} />
+		</label>
+
+		<button class="btn btn-success w-full" onclick={() => addBurnedCalories()}>Burn Calories</button
+		>
+	</div>
 </div>
