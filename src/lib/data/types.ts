@@ -15,6 +15,12 @@ export type WeightItem = {
 	};
 };
 
+export type SortedWeights = {
+	current: number;
+	ath: number;
+	atl: number;
+};
+
 export type UserSettings = {
 	activityFactor: number;
 	age: number;
@@ -28,3 +34,5 @@ export type UserSettings = {
 };
 
 export type CalorieSelector = 'calorieBurn' | 'calorieIntake';
+
+export type ModalSelector = 'calorieAddModal' | 'calorieBurnModal' | 'weightUpdateModal';

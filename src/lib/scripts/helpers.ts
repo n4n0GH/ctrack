@@ -55,3 +55,30 @@ export const findLowestWeight = (weights: WeightItem[] | DocumentData[]) => {
 export const findHighestWeight = (weights: WeightItem[] | DocumentData[]) => {
 	return weights.reduce((a, b) => (a.weight > b.weight ? a : b));
 };
+
+/**
+ * checks if a number has two digits and if not, pads it with a leading 0
+ * @param time the number to add padding to
+ * @returns the padded time string
+ */
+export const timePadding = (time: number) => {
+	return String(time).padStart(2, '0');
+};
+
+/**
+ *
+ * @returns a new date as ISO string
+ */
+export const getIsoDate = () => {
+	return new Date().toISOString();
+};
+
+/**
+ *
+ * @param date the date string
+ * @param time the time string
+ * @returns a timestamp data
+ */
+export const getStampedDate = (date: string, time: string) => {
+	return new Date(date + 'T' + time).getTime();
+};

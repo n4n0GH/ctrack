@@ -27,13 +27,13 @@ export const calorieGoal = (
 };
 
 /**
- *
- * @param foodData list of historic food intake
- * @returns the amount of calories taken in "today"
+ * parses through a list of items to calculate a value for today's calories
+ * @param calorieData list of historic food intake
+ * @returns the amount of calories for "today"
  */
-export const usedCalories = (foodData: EnergyItem[] | DocumentData[]) => {
+export const usedCalories = (calorieData: (EnergyItem | DocumentData)[]) => {
 	return Math.floor(
-		foodData
+		calorieData
 			.map((item) => {
 				const sameDay = isToday(item.date.seconds);
 				return sameDay ? item.energyValue : 0;
@@ -51,4 +51,26 @@ export const usedCalories = (foodData: EnergyItem[] | DocumentData[]) => {
  */
 export const deficitReduction = (totalCalories: number, usedCalories: number, deficit: number) => {
 	return totalCalories < usedCalories ? usedCalories - totalCalories : 0;
+};
+
+/**
+ * Calculates an estimate of burned calories for a specific cardio exercise using MET and time
+ * @param weight user's current weight
+ * @param time value in minutes
+ * @param met metabolic equivalent value of exercise
+ * @returns the amount of burned calories
+ */
+export const calculateCardioCalories = (weight: number, time: number, met: number) => {
+	return met * weight * (time / 60) * 1.036;
+};
+
+/**
+ *
+ * @param v average speed in kph
+ * @param d total driven distance in km
+ * @param w user weight in kg
+ * @returns the estimated amount of burned calories
+ */
+export const calculateCyclingCalories = (v: number, d: number, w: number) => {
+	return ((v * d) / 3.5) * w * 0.0034;
 };

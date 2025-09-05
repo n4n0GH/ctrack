@@ -9,7 +9,7 @@ import {
 	PUBLIC_APP_ID
 } from '$env/static/public';
 
-import type { CalorieSelector, EnergyItem } from '$lib/data/types';
+import type { CalorieSelector, EnergyItem, WeightItem } from '$lib/data/types';
 
 const firebaseConfig = {
 	apiKey: PUBLIC_API_KEY,
@@ -22,6 +22,15 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+
+/**
+ * Exposes Firebase timestamping util to the application
+ * @param stamp UNIX millisecond timestamp
+ * @returns Timestamp object with seconds and nanoseconds
+ */
+export const getFbTime = (stamp: number) => {
+	return Timestamp.fromMillis(stamp);
+};
 
 /**
  * fetches the user settings from firebase
@@ -66,7 +75,7 @@ export const addCalories = async (path: CalorieSelector, calorieItem: EnergyItem
 			updateSuccess = true;
 		})
 		.catch((e) => {
-			console.log(e);
+			console.error(e);
 			updateSuccess = false;
 		});
 	return {
@@ -76,10 +85,19 @@ export const addCalories = async (path: CalorieSelector, calorieItem: EnergyItem
 };
 
 /**
- * Exposes Firebase timestamping util to the application
- * @param stamp UNIX millisecond timestamp
- * @returns Timestamp object with seconds and nanoseconds
+ * adds a new document to the weightHistory collection
+ * @param newWeight object of type WeightItem to add to the collection
+ * @returns an object with the success status and data
  */
-export const getFbTime = (stamp: number) => {
-	return Timestamp.fromMillis(stamp);
+export const addWeight = async (newWeight: WeightItem) => {
+	let updateSuccess = false;
+	await addDoc(collection(db, 'weightHistory'), newWeight)
+		.then(() => {
+			updateSuccess = true;
+		})
+		.catch((e) => {
+			console.error(e);
+			updateSuccess = false;
+		});
+	return { success: updateSuccess, data: newWeight };
 };

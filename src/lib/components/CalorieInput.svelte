@@ -1,70 +1,55 @@
 <script lang="ts">
-	import { getFbTime, addCalories } from '$lib/middleware/firebase';
-	import { updateIntake, updateBurn } from '$lib/state/calories.svelte';
+	import { getFbTime } from '$lib/middleware/firebase';
+	import { timePadding, getIsoDate, getStampedDate } from '$lib/scripts/helpers';
+	import { Update } from '$lib/scripts/dataInit';
 
-	const timePadding = (time: number) => {
-		return String(time).padStart(2, '0');
-	};
+	let { mode }: { mode?: 'add' | 'burn' } = $props();
 
-	let getIsoDate = new Date().toISOString();
 	let calorieName = $state('');
 	let calorieValue = $state(0);
-	let date = $state(getIsoDate.split('T')[0]);
+	let date = $state(getIsoDate().split('T')[0]);
 	let time = $state(
 		timePadding(new Date().getHours()) + ':' + timePadding(new Date().getMinutes())
 	);
 
-	const getStampedDate = () => {
-		return new Date(date + 'T' + time).getTime();
-	};
+	const pushTo = new Update();
 
 	const createCalorieItem = () => {
 		return {
 			name: calorieName,
 			energyValue: calorieValue,
 			date: {
-				seconds: getFbTime(getStampedDate()).seconds,
-				nanoseconds: getFbTime(getStampedDate()).nanoseconds
+				seconds: getFbTime(getStampedDate(date, time)).seconds,
+				nanoseconds: getFbTime(getStampedDate(date, time)).nanoseconds
 			}
 		};
 	};
 
 	const addConsumedCalories = async () => {
-		await addCalories('calorieIntake', createCalorieItem()).then((item) => {
-			if (item.success) updateIntake(item.data);
-		});
+		await pushTo.calories('calorieIntake', createCalorieItem());
 	};
 
 	const addBurnedCalories = async () => {
-		await addCalories('calorieBurn', createCalorieItem()).then((item) => {
-			if (item.success) updateBurn(item.data);
-		});
+		await pushTo.calories('calorieBurn', createCalorieItem());
 	};
 </script>
 
-<div class="tabs tabs-border">
-	<input
-		type="radio"
-		name="calorie_tabs"
-		class="tab border-base-300 bg-base-100"
-		aria-label="Consumed"
-		checked
-	/>
-	<div class="tab-content border-base-300 bg-base-100 p-10">
-		<label class="input">
+{#if mode == 'add'}
+	<div class="border-base-300 bg-base-100 flex flex-col gap-3">
+		<label class="input w-full">
 			Name
 			<input type="text" class="grow" placeholder="Borgir" bind:value={calorieName} />
 		</label>
-		<label class="input">
+		<label class="input w-full">
 			Calories
 			<input type="number" class="grow" placeholder="9001" bind:value={calorieValue} />
 			<span class="badge badge-neutral badge-xs">kcal</span>
 		</label>
-		<label class="input">
+		<label class="input w-full">
 			Date
 			<input type="date" class="input" bind:value={date} />
 		</label>
-		<label class="input">
+		<label class="input w-full">
 			Time
 			<input type="time" class="input" bind:value={time} />
 		</label>
@@ -73,28 +58,22 @@
 			>Add Calories</button
 		>
 	</div>
-
-	<input
-		type="radio"
-		name="calorie_tabs"
-		class="tab border-base-300 bg-base-100"
-		aria-label="Burned"
-	/>
-	<div class="tab-content border-base-300 bg-base-100 p-10">
-		<label class="input">
+{:else if mode == 'burn'}
+	<div class="border-base-300 bg-base-100 flex flex-col gap-3">
+		<label class="input w-full">
 			Activity
 			<input type="text" class="grow" placeholder="Cycling" bind:value={calorieName} />
 		</label>
-		<label class="input">
+		<label class="input w-full">
 			Calories
 			<input type="number" class="grow" placeholder="9001" bind:value={calorieValue} />
 			<span class="badge badge-neutral badge-xs">kcal</span>
 		</label>
-		<label class="input">
+		<label class="input w-full">
 			Date
 			<input type="date" class="input" bind:value={date} />
 		</label>
-		<label class="input">
+		<label class="input w-full">
 			Time
 			<input type="time" class="input" bind:value={time} />
 		</label>
@@ -102,4 +81,4 @@
 		<button class="btn btn-success w-full" onclick={() => addBurnedCalories()}>Burn Calories</button
 		>
 	</div>
-</div>
+{/if}

@@ -30,6 +30,7 @@
 		"vite-plugin-devtools-json": "^0.2.0"
 	},
 	"dependencies": {
+		"@carbon/charts-svelte": "^1.22.18",
 		"daisyui": "^5.0.43",
 		"firebase": "^11.10.0"
 	}

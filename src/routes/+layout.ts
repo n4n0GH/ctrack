@@ -1,17 +1,19 @@
-import type { LayoutServerData } from './$types';
 import { getUserSettings, getUserWeight, getCalories } from '$lib/middleware/firebase';
 import { findNewestWeight, findLowestWeight, findHighestWeight } from '$lib/scripts/helpers';
-import { initUserWeight } from '$lib/state/weight.svelte';
-import { updateSettings } from '$lib/state/settings.svelte';
-import { initCalories, getUserCalories } from '$lib/state/calories.svelte';
+import { updateSettings, initUserWeight, initCalories } from '$lib/scripts/stateModifier.svelte';
+import { Update, Fetch, Init } from '$lib/scripts/dataInit';
+
+const init = new Init();
+const pull = new Fetch();
+const pushTo = new Update();
 
 const fetchData = async () => {
-	const settings = await getUserSettings();
-	const weights = await getUserWeight();
-	const caloriesIn = await getCalories('calorieIntake');
-	const caloriesOut = await getCalories('calorieBurn');
+	const dbSettings = await pull.settings();
+	const weights = await pull.weights();
+	const caloriesIn = await pull.calories('calorieIntake');
+	const caloriesOut = await pull.calories('calorieBurn');
 	return {
-		settings: settings,
+		settings: dbSettings,
 		weights: weights,
 		calories: { intake: caloriesIn, burned: caloriesOut }
 	};
@@ -19,32 +21,32 @@ const fetchData = async () => {
 
 export const load = async () => {
 	await fetchData().then((data) => {
-		const weights = data.weights;
-		const calories = data.calories;
-		const settings = data.settings;
+		const fweights = data.weights;
+		const fcalories = data.calories;
+		const fsettings = data.settings;
 
-		const currentWeight = findNewestWeight(weights);
-		const athWeight = findHighestWeight(weights);
-		const atlWeight = findLowestWeight(weights);
+		const currentWeight = findNewestWeight(fweights);
+		const athWeight = findHighestWeight(fweights);
+		const atlWeight = findLowestWeight(fweights);
 
 		const newSettings = {
-			activityFactor: settings.activityFactor,
-			age: settings.age,
+			activityFactor: fsettings.activityFactor,
+			age: fsettings.age,
 			currentWeight: currentWeight.weight,
-			startingWeight: settings.startingWeight,
+			startingWeight: fsettings.startingWeight,
 			lowestWeight: atlWeight.weight,
-			height: settings.height,
+			height: fsettings.height,
 			highestWeight: athWeight.weight,
-			gender: settings.gender,
-			deficit: settings.deficit
+			gender: fsettings.gender,
+			deficit: fsettings.deficit
 		};
 		const calorieData = {
-			intake: calories.intake,
-			burned: calories.burned
+			intake: fcalories.intake,
+			burned: fcalories.burned
 		};
 
-		updateSettings(newSettings);
-		initCalories(calorieData);
-		initUserWeight(weights);
+		pushTo.settings(newSettings);
+		init.calories(calorieData);
+		init.weights(fweights);
 	});
 };
