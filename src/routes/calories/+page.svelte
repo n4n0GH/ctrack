@@ -19,30 +19,6 @@
 		return map;
 	}
 
-	const chartOptions = {
-		axes: {
-			left: {
-				mapsTo: 'value',
-				includeZero: false,
-				scaleType: ScaleTypes.LOG
-			},
-			bottom: {
-				scaleType: ScaleTypes.TIME,
-				mapsTo: 'date'
-			}
-		},
-		legend: {
-			clickable: false,
-			position: 'top',
-			enabled: false
-		},
-		toolbar: {
-			enabled: false
-		},
-		curve: 'curveMonotoneX',
-		height: '320px'
-	};
-
 	let caloriesIn = calories.intake.map((item) => {
 		return {
 			name: item.name,
@@ -51,6 +27,7 @@
 			type: 'intake'
 		};
 	});
+
 	let caloriesOut = calories.burned.map((item) => {
 		return {
 			name: item.name,
@@ -63,6 +40,7 @@
 	let union = caloriesIn.concat(caloriesOut).sort((a, b) => b.date.seconds - a.date.seconds);
 
 	let sorted = groupCalories(union, (calorie) => toHumanDate(calorie.date.seconds));
+
 	let chartSorted = Array.from(sorted).map((item) => {
 		const totalValue = item[1].reduce((a: number, b: any) => {
 			if (b.type === 'intake') {
@@ -71,12 +49,50 @@
 				return a - b.energyValue;
 			}
 		}, 0);
+		/* @dev we need to sanitize the output as the chart can't
+		    display 0 values with LOG scaling and with enough burned
+			calories it may cause negative values to appear and crash
+			the chart entirely
+		*/
 		return {
 			group: 'Total Calories',
 			date: item[0],
-			value: totalValue
+			value: totalValue >= 0 ? totalValue : 0.0001
 		};
 	});
+
+	let calorieAverage = () => {
+		const totalCalories = chartSorted.reduce((a: any, b: any) => {
+			return a + b.value;
+		}, 0);
+		const averages = totalCalories / chartSorted.length;
+		return averages;
+	};
+
+	let chartOptions = {
+		axes: {
+			left: {
+				mapsTo: 'value',
+				includeZero: false,
+				scaleType: ScaleTypes.LINEAR,
+				thresholds: [{ value: calorieAverage(), label: 'Average Calories' }]
+			},
+			bottom: {
+				scaleType: ScaleTypes.TIME,
+				mapsTo: 'date'
+			}
+		},
+		legend: {
+			clickable: false,
+			position: 'bottom',
+			alignment: 'center'
+		},
+		toolbar: {
+			enabled: false
+		},
+		curve: 'curveMonotoneX',
+		height: '320px'
+	};
 </script>
 
 <Container title="Chart">

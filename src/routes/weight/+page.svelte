@@ -48,7 +48,7 @@
 		<LineChart options={chartOptions} data={chartData}></LineChart>
 	</div>
 </Container>
-<Container title="Datapoints">
+<Container title="Details">
 	<ul class="timeline timeline-vertical w-full items-center justify-center">
 		{#each weights as weight}
 			<li class="mb-2">
