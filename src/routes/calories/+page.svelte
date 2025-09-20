@@ -1,7 +1,10 @@
 <script lang="ts">
 	import Container from '$lib/components/Container.svelte';
 	import { calories } from '$lib/state/calories.svelte';
-	import { toHumanDate } from '$lib/scripts/helpers';
+	import { getAgeFactor, toHumanDate } from '$lib/scripts/helpers';
+	import { calorieGoal } from '$lib/scripts/calories';
+	import { settings } from '$lib/state/settings.svelte';
+	import { userWeights } from '$lib/state/weight.svelte';
 	import { LineChart, ScaleTypes } from '@carbon/charts-svelte';
 	import '@carbon/charts-svelte/styles.css';
 
@@ -18,6 +21,32 @@
 		});
 		return map;
 	}
+
+	const ageFactor = getAgeFactor(settings.gender);
+
+	let sortedWeights = userWeights.sort((a, b) => b.date.seconds - a.date.seconds);
+	let chartDataWeights = sortedWeights.map((weight) => {
+		const caloricGoal = calorieGoal(
+			settings.age,
+			ageFactor,
+			weight.weight,
+			settings.height,
+			settings.activityFactor,
+			settings.deficit
+		);
+		return {
+			group: 'Calorie Target',
+			date: new Date(weight.date.seconds * 1000).toISOString(),
+			value: caloricGoal
+		};
+	});
+	let chartDataTdee = chartDataWeights.map((item) => {
+		return {
+			group: 'TDEE',
+			date: item.date,
+			value: item.value + settings.deficit
+		};
+	});
 
 	let caloriesIn = calories.intake.map((item) => {
 		return {
@@ -55,7 +84,7 @@
 			the chart entirely
 		*/
 		return {
-			group: 'Total Calories',
+			group: 'Daily Intake',
 			date: item[0],
 			value: totalValue >= 0 ? totalValue : 0.0001
 		};
@@ -69,13 +98,15 @@
 		return averages;
 	};
 
+	let allData = chartSorted.concat(chartDataWeights, chartDataTdee);
+
 	let chartOptions = {
 		axes: {
 			left: {
 				mapsTo: 'value',
 				includeZero: false,
-				scaleType: ScaleTypes.LINEAR,
-				thresholds: [{ value: calorieAverage(), label: 'Average Calories' }]
+				scaleType: ScaleTypes.LOG,
+				thresholds: [{ value: calorieAverage(), label: 'Average Calories', fillColor: '#00bc7d' }]
 			},
 			bottom: {
 				scaleType: ScaleTypes.TIME,
@@ -97,7 +128,7 @@
 
 <Container title="Chart">
 	<div class="mx-2 my-4 mr-8 w-full items-center justify-center">
-		<LineChart options={chartOptions} data={chartSorted}></LineChart>
+		<LineChart options={chartOptions} data={allData}></LineChart>
 	</div>
 </Container>
 <Container title="Details">
