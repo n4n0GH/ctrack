@@ -195,19 +195,25 @@
 					<div class="inline-flex border-b border-dashed">
 						<p class="text-xl">{calorie[0]}</p>
 						<p class="text-right text-xl">
-							{calorie[1].reduce((a, b) => {
-								if (b.type === 'intake') {
-									return a + b.energyValue;
-								} else {
-									return a - b.energyValue;
-								}
-							}, 0)} kcal
+							{Math.round(
+								calorie[1].reduce((a, b) => {
+									if (b.type === 'intake') {
+										return a + b.energyValue;
+									} else {
+										return a - b.energyValue;
+									}
+								}, 0)
+							)} kcal
 						</p>
 					</div>
 					{#each calorie[1] as item}
 						<div class="inline-flex text-current/75">
 							<p class="text-left">{item.name}</p>
-							<p class="text-right">{item.type === 'intake' ? '+' : '-'}{item.energyValue} kcal</p>
+							<p
+								class="text-right {item.type === 'intake' ? 'text-amber-500' : 'text-emerald-500'}"
+							>
+								{item.type === 'intake' ? '+' : '-'}{item.energyValue} kcal
+							</p>
 						</div>
 					{/each}
 				</div>
