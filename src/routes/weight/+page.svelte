@@ -6,7 +6,22 @@
 	import { toHumanDate } from '$lib/scripts/helpers';
 	import { settings } from '$lib/state/settings.svelte';
 
+	let compareWeight = 0;
 	let weights = userWeights.sort((a, b) => b.date.seconds - a.date.seconds);
+	let comparedWeights = weights
+		.sort((a, b) => a.date.seconds - b.date.seconds)
+		.map((weight) => {
+			const change =
+				weight.weight > compareWeight ? 'up' : weight.weight < compareWeight ? 'down' : 'no';
+			compareWeight = weight.weight;
+			return {
+				weight: weight.weight,
+				change: change,
+				date: toHumanDate(weight.date.seconds),
+				timestamp: weight.date.seconds
+			};
+		})
+		.sort((a, b) => b.timestamp - a.timestamp);
 	let chartData = weights.map((weight) => {
 		return {
 			group: 'Weight',
@@ -21,7 +36,8 @@
 	const getDuration = () => {
 		const newest = weights.at(0);
 		const oldest = weights.at(-1);
-		return Math.round((newest?.date.seconds - oldest?.date.seconds) / 60 / 60 / 24);
+		const days = Math.round((newest?.date.seconds - oldest?.date.seconds) / 60 / 60 / 24);
+		return days < 0 ? days * -1 : days;
 	};
 	const getAverage = () => {
 		return Math.round((weightDiff.value / getDuration()) * 30);
@@ -155,22 +171,54 @@
 </Container>
 <Container title="Details">
 	<ul class="timeline timeline-vertical w-full items-center justify-center">
-		{#each weights as weight}
+		{#each comparedWeights as weight}
 			<li class="mb-2">
-				<div class="timeline-start">{toHumanDate(weight.date.seconds)}</div>
+				<div class="timeline-start">{weight.date}</div>
 				<div class="timeline-middle mx-6">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						viewBox="0 0 20 20"
-						fill="currentColor"
-						class="h-5 w-5"
-					>
-						<path
-							fill-rule="evenodd"
-							d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-							clip-rule="evenodd"
-						/>
-					</svg>
+					{#if weight.change === 'up'}
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentColor"
+							class="size-6"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M4.5 10.5 12 3m0 0 7.5 7.5M12 3v18"
+							/>
+						</svg>
+					{:else if weight.change === 'down'}<svg
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentColor"
+							class="size-6"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M19.5 13.5 12 21m0 0-7.5-7.5M12 21V3"
+							/>
+						</svg>
+					{:else}<svg
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentColor"
+							class="size-6"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M3 7.5 7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5"
+							/>
+						</svg>
+					{/if}
 				</div>
 				<div class="timeline-end timeline-box text-primary text-2xl font-bold">
 					{weight.weight} KG
