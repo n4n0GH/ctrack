@@ -116,7 +116,7 @@
 			}
 		},
 		legend: {
-			clickable: false,
+			clickable: true,
 			position: 'bottom',
 			alignment: 'center'
 		},

@@ -5,6 +5,8 @@
 	import { userWeights } from '$lib/state/weight.svelte';
 	import { toHumanDate } from '$lib/scripts/helpers';
 	import { settings } from '$lib/state/settings.svelte';
+	import { getBmiLabel, getFatLevel } from '$lib/scripts/helpers';
+	import type { WeightItem } from '$lib/data/types';
 
 	let compareWeight = 0;
 	let weights = userWeights.sort((a, b) => b.date.seconds - a.date.seconds);
@@ -13,12 +15,19 @@
 		.map((weight) => {
 			const change =
 				weight.weight > compareWeight ? 'up' : weight.weight < compareWeight ? 'down' : 'no';
+			const newDiff =
+				compareWeight === 0 ? 0 : (Math.round((compareWeight - weight.weight) * 10) / 10) * -1;
 			compareWeight = weight.weight;
 			return {
 				weight: weight.weight,
 				change: change,
+				diff: newDiff,
 				date: toHumanDate(weight.date.seconds),
-				timestamp: weight.date.seconds
+				timestamp: weight.date.seconds,
+				details: !!weight.fat || !!weight.muscle || !!weight.visceral,
+				fat: weight.fat || undefined,
+				muscle: weight.muscle || undefined,
+				visceral: weight.visceral || undefined
 			};
 		})
 		.sort((a, b) => b.timestamp - a.timestamp);
@@ -30,7 +39,7 @@
 		};
 	});
 	let weightDiff = {
-		value: settings.highestWeight - settings.currentWeight,
+		value: Math.round((settings.highestWeight - settings.currentWeight) * 10) / 10,
 		loss: settings.highestWeight > settings.currentWeight
 	};
 	const getDuration = () => {
@@ -42,12 +51,43 @@
 	const getAverage = () => {
 		return Math.round((weightDiff.value / getDuration()) * 30);
 	};
+
+	const getBmi = (weight: number, height: number) => {
+		return Math.round((weight / (height / 100) ** 2) * 10) / 10;
+	};
+	const getBmiThreshold = (bmi: number, height: number) => {
+		return Math.round(bmi * (height / 100) ** 2 * 10) / 10;
+	};
+
+	const currentBmi = getBmi(settings.currentWeight, settings.height);
+
+	const getFatColor = (fat: number) => {
+		const label = getFatLevel(fat, settings.age, settings.gender);
+		return label === 'Obese'
+			? 'text-red-500'
+			: label === 'Overfat'
+				? 'text-amber-500'
+				: label === 'Healthy'
+					? 'text-emerald-500'
+					: 'text-sky-500';
+	};
+
 	const chartOptions = {
 		axes: {
 			left: {
 				mapsTo: 'value',
 				includeZero: false,
-				scaleType: ScaleTypes.LOG
+				scaleType: ScaleTypes.LOG,
+				thresholds: [
+					{
+						value: getBmiThreshold(35, settings.height),
+						label: 'BMI 35 - ' + getBmiLabel(35)
+					},
+					{
+						value: getBmiThreshold(30, settings.height),
+						label: 'BMI 30 - ' + getBmiLabel(30)
+					}
+				]
 			},
 			bottom: {
 				scaleType: ScaleTypes.TIME,
@@ -115,7 +155,7 @@
 					</div>
 					<div class="stat-title">Total {weightDiff.loss ? 'Loss' : 'Gain'}</div>
 					<div class="stat-value">{weightDiff.loss ? '-' : '+'}{weightDiff.value} KG</div>
-					<div class="stat-desc">Since Start</div>
+					<div class="stat-desc">In {getDuration()} Days</div>
 				</div>
 				<div class="stat">
 					<div class="stat-figure text-secondary">
@@ -157,73 +197,65 @@
 							<path
 								stroke-linecap="round"
 								stroke-linejoin="round"
-								d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5m-9-6h.008v.008H12v-.008ZM12 15h.008v.008H12V15Zm0 2.25h.008v.008H12v-.008ZM9.75 15h.008v.008H9.75V15Zm0 2.25h.008v.008H9.75v-.008ZM7.5 15h.008v.008H7.5V15Zm0 2.25h.008v.008H7.5v-.008Zm6.75-4.5h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V15Zm0 2.25h.008v.008h-.008v-.008Zm2.25-4.5h.008v.008H16.5v-.008Zm0 2.25h.008v.008H16.5V15Z"
+								d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"
 							/>
 						</svg>
 					</div>
-					<div class="stat-title">Logging</div>
-					<div class="stat-value">{getDuration()}</div>
-					<div class="stat-desc">Days</div>
+					<div class="stat-title">BMI</div>
+					<div class="stat-value">{currentBmi}</div>
+					<div class="stat-desc">{getBmiLabel(currentBmi)}</div>
 				</div>
 			</div>
 		</div>
 	</div>
 </Container>
 <Container title="Details">
-	<ul class="timeline timeline-vertical w-full items-center justify-center">
+	<div class="mx-4 my-2 w-full flex-row items-center justify-center">
 		{#each comparedWeights as weight}
-			<li class="mb-2">
-				<div class="timeline-start">{weight.date}</div>
-				<div class="timeline-middle mx-6">
-					{#if weight.change === 'up'}
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke-width="1.5"
-							stroke="currentColor"
-							class="size-6"
+			<div class="card card-border bg-base-100 mb-3 shadow">
+				<div class="card-body">
+					<div class="inline-flex border-b border-dashed">
+						<p class="text-xl">{weight.date}</p>
+						<p class="text-right text-xl">
+							{weight.weight} KG
+						</p>
+					</div>
+					<div class="inline-flex text-current/75">
+						<p class="text-left">Change</p>
+						<p
+							class="text-right {weight.change === 'up'
+								? 'text-red-500'
+								: weight.change === 'down'
+									? 'text-emerald-500'
+									: 'text-amber-500'}"
 						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								d="M4.5 10.5 12 3m0 0 7.5 7.5M12 3v18"
-							/>
-						</svg>
-					{:else if weight.change === 'down'}<svg
-							xmlns="http://www.w3.org/2000/svg"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke-width="1.5"
-							stroke="currentColor"
-							class="size-6"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								d="M19.5 13.5 12 21m0 0-7.5-7.5M12 21V3"
-							/>
-						</svg>
-					{:else}<svg
-							xmlns="http://www.w3.org/2000/svg"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke-width="1.5"
-							stroke="currentColor"
-							class="size-6"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								d="M3 7.5 7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5"
-							/>
-						</svg>
+							{weight.diff} KG
+						</p>
+					</div>
+					{#if weight.details}
+						{#if !!weight.muscle}
+							<div class="inline-flex text-current/75">
+								<p class="text-left">Muscle Mass</p>
+								<p class="text-right">{weight.muscle}%</p>
+							</div>
+						{/if}
+						{#if !!weight.fat}
+							<div class="inline-flex text-current/75">
+								<p class="text-left">Body Fat</p>
+								<p class="text-right {getFatColor(weight.fat)}">{weight.fat}%</p>
+							</div>
+						{/if}
+						{#if !!weight.visceral}
+							<div class="inline-flex text-current/75">
+								<p class="text-left">Visceral Fat</p>
+								<p class="text-right {weight.visceral >= 13 ? 'text-red-500' : 'text-emerald-500'}">
+									{weight.visceral}
+								</p>
+							</div>
+						{/if}
 					{/if}
 				</div>
-				<div class="timeline-end timeline-box text-primary text-2xl font-bold">
-					{weight.weight} KG
-				</div>
-			</li>
+			</div>
 		{/each}
-	</ul>
+	</div>
 </Container>

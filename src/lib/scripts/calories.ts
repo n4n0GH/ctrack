@@ -23,7 +23,7 @@ export const calorieGoal = (
 	const w = 10 * weight;
 	const h = 6.25 * height;
 	const bmr = w + h - a;
-	return bmr * activityFactor - deficit;
+	return Math.round(bmr * activityFactor - deficit);
 };
 
 /**

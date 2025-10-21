@@ -9,5 +9,6 @@ export let settings = $state<UserSettings>({
 	height: 0,
 	highestWeight: 0,
 	gender: 'male',
-	deficit: 0
+	deficit: 0,
+	targetIsLoss: false
 });

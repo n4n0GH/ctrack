@@ -13,6 +13,9 @@ export type WeightItem = {
 		seconds: number;
 		nanoseconds: number;
 	};
+	fat?: number | undefined;
+	muscle?: number | undefined;
+	visceral?: number | undefined;
 };
 
 export type SortedWeights = {
@@ -31,8 +34,20 @@ export type UserSettings = {
 	highestWeight: number;
 	lowestWeight: number;
 	startingWeight: number;
+	targetIsLoss: boolean;
 };
 
 export type CalorieSelector = 'calorieBurn' | 'calorieIntake';
 
 export type ModalSelector = 'calorieAddModal' | 'calorieBurnModal' | 'weightUpdateModal';
+
+export type BmiItem = {
+	label:
+		| 'Underweight'
+		| 'Normal Weight'
+		| 'Overweight'
+		| 'Obesity Type I'
+		| 'Obesity Type II'
+		| 'Obesity Type III';
+	limit: number;
+};

@@ -38,7 +38,8 @@ export const load = async () => {
 			height: fsettings.height,
 			highestWeight: athWeight.weight,
 			gender: fsettings.gender,
-			deficit: fsettings.deficit
+			deficit: fsettings.deficit,
+			targetIsLoss: fsettings.targetIsLoss
 		};
 		const calorieData = {
 			intake: fcalories.intake,

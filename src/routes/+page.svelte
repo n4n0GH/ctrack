@@ -103,7 +103,7 @@
 			<div class="stat items-end font-mono">
 				<div class="stat-desc text-right">ATH: {settings.highestWeight}</div>
 				<div class="stat-desc text-right">ATL: {settings.lowestWeight}</div>
-				<div class="stat-desc text-right">TRGT: DOWN</div>
+				<div class="stat-desc text-right">MODE: {settings.targetIsLoss ? 'LOSS' : 'GAIN'}</div>
 			</div>
 			<div class="stat">
 				<div class="stat-value">

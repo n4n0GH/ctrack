@@ -1,4 +1,4 @@
-import type { WeightItem } from '$lib/data/types';
+import type { WeightItem, BmiItem } from '$lib/data/types';
 import type { DocumentData } from 'firebase/firestore';
 
 /**
@@ -81,4 +81,106 @@ export const getIsoDate = () => {
  */
 export const getStampedDate = (date: string, time: string) => {
 	return new Date(date + 'T' + time).getTime();
+};
+
+/**
+ *
+ * @param bmi the lookup value
+ * @returns the bmi label
+ */
+export const getBmiLabel = (bmi: number) => {
+	const dict: BmiItem[] = [
+		{ label: 'Underweight', limit: 18.5 },
+		{ label: 'Normal Weight', limit: 25 },
+		{ label: 'Overweight', limit: 30 },
+		{ label: 'Obesity Type I', limit: 35 },
+		{ label: 'Obesity Type II', limit: 40 },
+		{ label: 'Obesity Type III', limit: 999 }
+	];
+
+	const lookup = dict.find((entry) => entry.limit > bmi);
+	if (lookup) {
+		return lookup.label;
+	} else {
+		return 'Your weight and my phonenumber are not too far apart...';
+	}
+};
+
+/**
+ * finds out if the user is underfat, healthy, overfat or obese
+ * @param fat the bodyfat percentage
+ * @param age the user's age
+ * @param gender the user's gender
+ * @returns the bodyfat level as string
+ */
+export const getFatLevel = (fat: number, age: number, gender: 'male' | 'female') => {
+	const dict = [
+		{
+			gender: 'female',
+			limits: [
+				{
+					age: 39,
+					levels: [
+						{ label: 'Underfat', value: 21 },
+						{ label: 'Healthy', value: 33 },
+						{ label: 'Overfat', value: 39.5 }
+					]
+				},
+				{
+					age: 59,
+					levels: [
+						{ label: 'Underfat', value: 23 },
+						{ label: 'Healthy', value: 34 },
+						{ label: 'Overfat', value: 40 }
+					]
+				},
+				{
+					age: 79,
+					levels: [
+						{ label: 'Underfat', value: 24 },
+						{ label: 'Healthy', value: 36.1 },
+						{ label: 'Overfat', value: 41.5 }
+					]
+				}
+			]
+		},
+		{
+			gender: 'male',
+			limits: [
+				{
+					age: 39,
+					levels: [
+						{ label: 'Underfat', value: 7 },
+						{ label: 'Healthy', value: 20 },
+						{ label: 'Overfat', value: 25 }
+					]
+				},
+				{
+					age: 59,
+					levels: [
+						{ label: 'Underfat', value: 10 },
+						{ label: 'Healthy', value: 22 },
+						{ label: 'Overfat', value: 28.4 }
+					]
+				},
+				{
+					age: 79,
+					levels: [
+						{ label: 'Underfat', value: 12 },
+						{ label: 'Healthy', value: 25 },
+						{ label: 'Overfat', value: 30 }
+					]
+				}
+			]
+		}
+	];
+	const lookup = dict
+		.find((item) => item.gender === gender)
+		?.limits.find((item) => item.age <= age)
+		?.levels.find((item) => item.value <= fat);
+	if (lookup) {
+		return lookup.label;
+	} else {
+		return 'Obese';
+	}
 };

@@ -100,6 +100,7 @@ const initSettings = (
 		height: settings.height,
 		highestWeight: weights.ath,
 		gender: settings.gender,
-		deficit: settings.deficit
+		deficit: settings.deficit,
+		targetIsLoss: settings.targetIsLoss
 	};
 };

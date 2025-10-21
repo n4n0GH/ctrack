@@ -30,6 +30,10 @@
 				<div class="stat-title">Activity Factor</div>
 				<div class="stat-value">{settings.activityFactor}</div>
 			</div>
+			<div class="stat">
+				<div class="stat-title">User Goal</div>
+				<div class="stat-value">{settings.targetIsLoss ? 'Weight Loss' : 'Weight Gain'}</div>
+			</div>
 		</div>
 		{#snippet clickable()}
 			<button class="btn btn-soft btn-success grow">Update</button>

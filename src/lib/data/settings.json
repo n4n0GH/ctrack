@@ -4,5 +4,6 @@
 	"age": 38,
 	"activity_factor": 1.2,
 	"gender": "male",
-	"deficit": 700
+	"deficit": 700,
+	"targetIsLoss": true
 }
