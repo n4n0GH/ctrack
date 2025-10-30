@@ -51,29 +51,27 @@
 </script>
 
 <div class="flex flex-wrap">
-	<Container>
-		<div role="none" class="stats w-full items-center justify-center">
-			<div class="stat">
+	<Container title="Calories">
+		<div role="none" class="stats bg-base-100 mb-4 w-full items-center shadow md:mx-4">
+			<div class="stat w-full justify-items-center">
 				<p class="mb-4 text-center">Target</p>
 				<RadialProgress color={calorieColor} percentage={usedCaloriesPercentage} />
-				<p class="mt-4 text-center">{delta}/{goal} kcal</p>
+				<p class="my-4 text-center">{delta}/{goal} kcal</p>
+				<button
+					class="btn btn-soft btn-success w-full grow shadow"
+					onclick={() => openModal('calorieAddModal')}>Add</button
+				>
 			</div>
-			<div class="stat">
+			<div class="stat w-full justify-items-center">
 				<p class="mb-4 text-center">Deficit</p>
 				<RadialProgress color={deficitColor} percentage={deficitPercentage} />
-				<p class="mt-4 text-center">{dailyDeficit}/{settings.deficit} kcal</p>
+				<p class="my-4 text-center">{dailyDeficit}/{settings.deficit} kcal</p>
+				<button
+					class="btn btn-soft btn-success w-full grow shadow"
+					onclick={() => openModal('calorieBurnModal')}>Burn</button
+				>
 			</div>
 		</div>
-		{#snippet clickable()}
-			<div class="flex w-full items-center justify-center gap-4">
-				<button class="btn btn-soft btn-success grow" onclick={() => openModal('calorieAddModal')}
-					>Add</button
-				>
-				<button class="btn btn-soft btn-success grow" onclick={() => openModal('calorieBurnModal')}
-					>Burn</button
-				>
-			</div>
-		{/snippet}
 	</Container>
 
 	<dialog id="calorieAddModal" class="modal modal-bottom sm:modal-middle">
@@ -98,25 +96,26 @@
 		</form>
 	</dialog>
 
-	<Container>
-		<div class="stats w-full items-center justify-center" role="none">
-			<div class="stat items-end font-mono">
-				<div class="stat-desc text-right">ATH: {settings.highestWeight}</div>
-				<div class="stat-desc text-right">ATL: {settings.lowestWeight}</div>
-				<div class="stat-desc text-right">MODE: {settings.targetIsLoss ? 'LOSS' : 'GAIN'}</div>
-			</div>
-			<div class="stat">
-				<div class="stat-value">
-					<span class="text-6xl md:text-8xl">{settings.currentWeight}</span>
-					<span class="text-2xl md:text-4xl">KG</span>
+	<Container title="Weight">
+		<div class="card bg-base-100 mb-4 w-full items-center px-4 pb-4 shadow md:mx-4">
+			<div class="stats items-center justify-center" role="none">
+				<div class="stat items-end font-mono">
+					<div class="stat-desc text-right">ATH: {settings.highestWeight}</div>
+					<div class="stat-desc text-right">ATL: {settings.lowestWeight}</div>
+					<div class="stat-desc text-right">MODE: {settings.targetIsLoss ? 'LOSS' : 'GAIN'}</div>
+				</div>
+				<div class="stat">
+					<div class="stat-value">
+						<span class="text-6xl md:text-8xl">{settings.currentWeight}</span>
+						<span class="text-2xl md:text-4xl">KG</span>
+					</div>
 				</div>
 			</div>
-		</div>
-		{#snippet clickable()}
-			<button class="btn btn-soft btn-success grow" onclick={() => openModal('weightUpdateModal')}
-				>Update</button
+			<button
+				class="btn btn-soft btn-success w-full grow shadow"
+				onclick={() => openModal('weightUpdateModal')}>Update</button
 			>
-		{/snippet}
+		</div>
 	</Container>
 
 	<dialog id="weightUpdateModal" class="modal modal-bottom sm:modal-middle">
