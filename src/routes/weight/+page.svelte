@@ -49,7 +49,7 @@
 		return days < 0 ? days * -1 : days;
 	};
 	const getAverage = () => {
-		return Math.round((weightDiff.value / getDuration()) * 30);
+		return Math.round(((weightDiff.value * 10) / getDuration()) * 30) / 10;
 	};
 
 	const getBmi = (weight: number, height: number) => {
@@ -72,6 +72,12 @@
 					: 'text-sky-500';
 	};
 
+	const toKg = (percentage: number, totalWeight: number) => {
+		return Math.round((totalWeight / 100) * percentage * 10) / 10;
+	};
+
+	// TODO generate second weight curve with an averaged predictive curve 1 month into the future
+
 	const chartOptions = {
 		axes: {
 			left: {
@@ -81,11 +87,23 @@
 				thresholds: [
 					{
 						value: getBmiThreshold(35, settings.height),
-						label: 'BMI 35 - ' + getBmiLabel(35)
+						label: 'BMI 35 - ' + getBmiLabel(35),
+						fillColor: '#fb2c36'
 					},
 					{
 						value: getBmiThreshold(30, settings.height),
-						label: 'BMI 30 - ' + getBmiLabel(30)
+						label: 'BMI 30 - ' + getBmiLabel(30),
+						fillColor: '#ff6900'
+					},
+					{
+						value: getBmiThreshold(25, settings.height),
+						label: 'BMI 25 - ' + getBmiLabel(25),
+						fillColor: '#fd9a00'
+					},
+					{
+						value: 85.8,
+						label: 'Average German Man',
+						fillColor: '#00bc7d'
 					}
 				]
 			},
@@ -157,7 +175,7 @@
 					<div class="stat-value">{weightDiff.loss ? '-' : '+'}{weightDiff.value} KG</div>
 					<div class="stat-desc">In {getDuration()} Days</div>
 				</div>
-				<div class="stat">
+				<div class="md:stat hidden">
 					<div class="stat-figure text-secondary">
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -236,19 +254,27 @@
 						{#if !!weight.muscle}
 							<div class="inline-flex text-current/75">
 								<p class="text-left">Muscle Mass</p>
-								<p class="text-right">{weight.muscle}%</p>
+								<p class="text-right">{weight.muscle}% ({toKg(weight.muscle, weight.weight)}KG)</p>
 							</div>
 						{/if}
 						{#if !!weight.fat}
 							<div class="inline-flex text-current/75">
 								<p class="text-left">Body Fat</p>
-								<p class="text-right {getFatColor(weight.fat)}">{weight.fat}%</p>
+								<p class="text-right {getFatColor(weight.fat)}">
+									{weight.fat}% ({toKg(weight.fat, weight.weight)}KG)
+								</p>
 							</div>
 						{/if}
 						{#if !!weight.visceral}
 							<div class="inline-flex text-current/75">
 								<p class="text-left">Visceral Fat</p>
-								<p class="text-right {weight.visceral >= 13 ? 'text-red-500' : 'text-emerald-500'}">
+								<p
+									class="text-right {weight.visceral >= 14
+										? 'text-red-500'
+										: weight.visceral >= 10
+											? 'text-amber-500'
+											: 'text-emerald-500'}"
+								>
 									{weight.visceral}
 								</p>
 							</div>
