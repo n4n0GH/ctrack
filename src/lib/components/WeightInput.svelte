@@ -6,7 +6,6 @@
 	import { Update } from '$lib/scripts/dataInit';
 
 	let weightValue = $derived(settings.currentWeight);
-	// TODO find latest weight item from userWeights, and derive the next three items from it
 	let latestWeight = userWeights.sort((a, b) => b.date.seconds - a.date.seconds)[0];
 	let visceralValue = $derived(latestWeight.visceral);
 	let bodyfatValue = $derived(latestWeight.fat);
