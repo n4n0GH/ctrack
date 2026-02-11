@@ -14,6 +14,18 @@
 
 	const pushTo = new Update();
 
+	// const getDialogId = () => {
+	// 	switch (mode) {
+	// 		case 'add':
+	// 			return 'calorieAddModal';
+	// 		case 'burn':
+	// 			return 'calorieBurnModal';
+	// 		default:
+	// 			return 'calorieAddModal';
+	// 	}
+	// };
+	// const dialog = (<HTMLElement>document.getElementById(getDialogId())) as HTMLDialogElement;
+
 	const createCalorieItem = () => {
 		return {
 			name: calorieName,
@@ -25,12 +37,24 @@
 		};
 	};
 
+	const clearInput = () => {
+		calorieName = '';
+		calorieValue = 0;
+		date = getIsoDate().split('T')[0];
+		time = timePadding(new Date().getHours()) + ':' + timePadding(new Date().getMinutes());
+		// dialog.close();
+	};
+
 	const addConsumedCalories = async () => {
-		await pushTo.calories('calorieIntake', createCalorieItem());
+		await pushTo.calories('calorieIntake', createCalorieItem()).then(() => {
+			clearInput();
+		});
 	};
 
 	const addBurnedCalories = async () => {
-		await pushTo.calories('calorieBurn', createCalorieItem());
+		await pushTo.calories('calorieBurn', createCalorieItem()).then(() => {
+			clearInput();
+		});
 	};
 </script>
 
