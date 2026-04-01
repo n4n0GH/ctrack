@@ -50,6 +50,7 @@
 
 	let caloriesIn = calories.intake.map((item) => {
 		return {
+			id: item.id,
 			name: item.name,
 			energyValue: item.energyValue,
 			date: item.date,
@@ -59,6 +60,7 @@
 
 	let caloriesOut = calories.burned.map((item) => {
 		return {
+			id: item.id,
 			name: item.name,
 			energyValue: item.energyValue,
 			date: item.date,
@@ -226,8 +228,8 @@
 	<div class="mx-4 my-2 w-full flex-row items-center justify-center">
 		{#each sorted as calorie}
 			<div class="card card-border bg-base-100 mb-3 shadow">
-				<div class="card-body">
-					<div class="inline-flex border-b border-dashed">
+				<div class="card-body gap-0">
+					<div class="mx-4 mb-2 inline-flex border-b border-dashed pb-2">
 						<p class="text-xl">{calorie[0]}</p>
 						<p class="text-right text-xl">
 							{Math.round(
@@ -242,14 +244,16 @@
 						</p>
 					</div>
 					{#each calorie[1] as item}
-						<div class="inline-flex text-current/75">
-							<p class="text-left">{item.name}</p>
+						<button
+							class="hover:bg-base-300 inline-flex rounded border-l-amber-500 px-4 py-1 text-current/75 hover:cursor-pointer hover:border-l-8"
+						>
+							<p class="text-left">{item.name} ({item.id})</p>
 							<p
 								class="text-right {item.type === 'intake' ? 'text-amber-500' : 'text-emerald-500'}"
 							>
 								{item.type === 'intake' ? '+' : '-'}{item.energyValue} kcal
 							</p>
-						</div>
+						</button>
 					{/each}
 				</div>
 			</div>

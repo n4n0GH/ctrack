@@ -5,6 +5,7 @@ export type EnergyItem = {
 		seconds: number;
 		nanoseconds: number;
 	};
+	id: string;
 };
 
 export type WeightItem = {

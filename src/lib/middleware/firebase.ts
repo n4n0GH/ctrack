@@ -1,5 +1,13 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, addDoc, Timestamp } from 'firebase/firestore/lite';
+import {
+	getFirestore,
+	collection,
+	doc,
+	getDocs,
+	addDoc,
+	updateDoc,
+	Timestamp
+} from 'firebase/firestore/lite';
 import {
 	PUBLIC_API_KEY,
 	PUBLIC_AUTH_DOMAIN,
@@ -60,13 +68,40 @@ export const getUserWeight = async () => {
 export const getCalories = async (path: CalorieSelector) => {
 	const caloriesCol = collection(db, path);
 	const calories = await getDocs(caloriesCol);
-	return calories.docs.map((doc) => doc.data());
+	return calories.docs.map((doc) => {
+		return {
+			id: doc.id,
+			...doc.data()
+		};
+	});
+};
+
+/**
+ * updates an existing document inside calorie collection
+ * @param path name of the calorie collection
+ * @param updateItem object with updated fields
+ */
+export const updateCalories = async (path: CalorieSelector, updateItem: EnergyItem) => {
+	let updateSuccess = false;
+	const docRef = doc(db, path);
+	await updateDoc(docRef, { name: updateItem.name, energyValue: updateItem.energyValue })
+		.then(() => {
+			updateSuccess = true;
+		})
+		.catch((e) => {
+			console.error(e);
+			updateSuccess = false;
+		});
+	return {
+		success: updateSuccess,
+		data: updateItem
+	};
 };
 
 /**
  * adds a new document to a calorie collection
  * @param path name of the calorie collection
- * @param calorieItem object of type EnergyItem to add to the collection
+ * @param calorieItem object to add to the collection
  */
 export const addCalories = async (path: CalorieSelector, calorieItem: EnergyItem) => {
 	let updateSuccess = false;
