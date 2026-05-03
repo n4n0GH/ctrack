@@ -3,6 +3,9 @@
 	import Container from '$lib/components/Container.svelte';
 </script>
 
+<svelte:head>
+	<title>CTrack - Settings</title>
+</svelte:head>
 <div class="flex flex-wrap">
 	<Container>
 		<div role="none" class="stats stats-vertical grow">

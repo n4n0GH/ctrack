@@ -17,7 +17,7 @@ import {
 	PUBLIC_APP_ID
 } from '$env/static/public';
 
-import type { CalorieSelector, EnergyItem, WeightItem } from '$lib/data/types';
+import type { CalorieSelector, EnergyItem, WeightItem, ActivityHistoryItem } from '$lib/data/types';
 
 const firebaseConfig = {
 	apiKey: PUBLIC_API_KEY,
@@ -58,6 +58,16 @@ export const getUserWeight = async () => {
 	const weightCol = collection(db, 'weightHistory');
 	const weights = await getDocs(weightCol);
 	return weights.docs.map((doc) => doc.data());
+};
+
+/**
+ * fetches the activity level history collection from firebase
+ * @returns the list of activity history objects
+ */
+export const getActivityHistory = async () => {
+	const activityCol = collection(db, 'activityHistory');
+	const activities = await getDocs(activityCol);
+	return activities.docs.map((doc) => doc.data());
 };
 
 /**

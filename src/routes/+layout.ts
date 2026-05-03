@@ -12,10 +12,12 @@ const fetchData = async () => {
 	const weights = await pull.weights();
 	const caloriesIn = await pull.calories('calorieIntake');
 	const caloriesOut = await pull.calories('calorieBurn');
+	const activityHistory = await pull.activities();
 	return {
 		settings: dbSettings,
 		weights: weights,
-		calories: { intake: caloriesIn, burned: caloriesOut }
+		calories: { intake: caloriesIn, burned: caloriesOut },
+		activityHistory: activityHistory
 	};
 };
 
@@ -24,6 +26,7 @@ export const load = async () => {
 		const fweights = data.weights;
 		const fcalories = data.calories;
 		const fsettings = data.settings;
+		const factivity = data.activityHistory;
 
 		const currentWeight = findNewestWeight(fweights);
 		const athWeight = findHighestWeight(fweights);
@@ -45,9 +48,13 @@ export const load = async () => {
 			intake: fcalories.intake,
 			burned: fcalories.burned
 		};
+		const activityData = {
+			history: factivity
+		};
 
 		pushTo.settings(newSettings);
 		init.calories(calorieData);
 		init.weights(fweights);
+		init.activities(activityData);
 	});
 };

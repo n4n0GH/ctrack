@@ -7,6 +7,7 @@
 	import { userWeights } from '$lib/state/weight.svelte';
 	import { LineChart, ScaleTypes } from '@carbon/charts-svelte';
 	import '@carbon/charts-svelte/styles.css';
+	import { activity } from '$lib/state/activityHistory.svelte';
 
 	function groupCalories<K, V>(list: Array<V>, keyGetter: (input: V) => K): Map<K, Array<V>> {
 		const map = new Map();
@@ -82,7 +83,8 @@
 		}, 0);
 		/* @dev we need to sanitize the output as the chart can't
 		    display 0 values with LOG scaling and with enough burned
-			calories it may cause negative values to appear and crash
+			calories (i.e. exercise before eating anything)
+			it may cause negative values to appear and crash
 			the chart entirely
 		*/
 		return {
@@ -138,6 +140,9 @@
 	};
 </script>
 
+<svelte:head>
+	<title>CTrack - Calories</title>
+</svelte:head>
 <Container title="Chart">
 	<div class="flex w-full flex-col gap-4 px-4 pb-4">
 		<div class="card card-border bg-base-100 w-full items-center justify-center p-4 shadow">

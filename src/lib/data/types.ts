@@ -5,7 +5,7 @@ export type EnergyItem = {
 		seconds: number;
 		nanoseconds: number;
 	};
-	id: string;
+	id?: string | undefined;
 };
 
 export type WeightItem = {
@@ -17,6 +17,11 @@ export type WeightItem = {
 	fat?: number | undefined;
 	muscle?: number | undefined;
 	visceral?: number | undefined;
+};
+
+export type ActivityHistoryItem = {
+	activityLevel: number;
+	date: number; // @dev this is going to be a unix timestamp
 };
 
 export type SortedWeights = {

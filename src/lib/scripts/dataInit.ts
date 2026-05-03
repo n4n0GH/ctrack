@@ -2,6 +2,7 @@ import {
 	getUserSettings,
 	getUserWeight,
 	getCalories,
+	getActivityHistory,
 	addCalories,
 	addWeight
 } from '$lib/middleware/firebase';
@@ -12,7 +13,8 @@ import {
 	initUserWeight,
 	updateIntake,
 	updateBurn,
-	initCalories
+	initCalories,
+	initActivityHistory
 } from '$lib/scripts/stateModifier.svelte';
 import { calories } from '$lib/state/calories.svelte';
 import type {
@@ -20,7 +22,8 @@ import type {
 	UserSettings,
 	WeightItem,
 	CalorieSelector,
-	EnergyItem
+	EnergyItem,
+	ActivityHistoryItem
 } from '$lib/data/types';
 import type { DocumentData } from 'firebase/firestore';
 
@@ -37,6 +40,10 @@ export class Fetch {
 		const calories = await getCalories(selector);
 		return calories;
 	}
+	async activities() {
+		const activities = await getActivityHistory();
+		return activities;
+	}
 }
 
 export class Init {
@@ -48,6 +55,9 @@ export class Init {
 	}
 	weights(dataset: (WeightItem | DocumentData)[]) {
 		initUserWeight(dataset);
+	}
+	activities(dataset: { history: (ActivityHistoryItem | DocumentData)[] }) {
+		initActivityHistory(dataset);
 	}
 }
 

@@ -1,7 +1,8 @@
 import { settings } from '$lib/state/settings.svelte';
 import { userWeights } from '$lib/state/weight.svelte';
 import { calories } from '$lib/state/calories.svelte';
-import type { UserSettings, WeightItem, EnergyItem } from '$lib/data/types';
+import { activity } from '$lib/state/activityHistory.svelte';
+import type { UserSettings, WeightItem, EnergyItem, ActivityHistoryItem } from '$lib/data/types';
 import type { DocumentData } from 'firebase/firestore';
 
 /* == App Settings == */
@@ -45,4 +46,10 @@ export const initCalories = (dataset: {
 }) => {
 	calories.intake = dataset.intake;
 	calories.burned = dataset.burned;
+};
+
+export const initActivityHistory = (dataset: {
+	history: (ActivityHistoryItem | DocumentData)[];
+}) => {
+	activity.history = dataset.history;
 };

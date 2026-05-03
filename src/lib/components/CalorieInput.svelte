@@ -33,8 +33,7 @@
 			date: {
 				seconds: getFbTime(getStampedDate(date, time)).seconds,
 				nanoseconds: getFbTime(getStampedDate(date, time)).nanoseconds
-			},
-			id: 'foobar'
+			}
 		};
 	};
 

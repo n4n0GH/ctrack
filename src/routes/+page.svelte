@@ -50,6 +50,9 @@
 	};
 </script>
 
+<svelte:head>
+	<title>CTrack - Home</title>
+</svelte:head>
 <div class="flex flex-wrap">
 	<Container title="Calories">
 		<div role="none" class="stats bg-base-100 mb-4 w-full items-center shadow md:mx-4">
