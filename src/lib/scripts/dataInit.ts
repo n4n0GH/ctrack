@@ -80,9 +80,9 @@ export class Update {
 		});
 	}
 	async weight(weightItem: WeightItem) {
-		await addWeight(weightItem).then((item) => {
-			if (item.success) addUserWeight(item.data);
-		});
+		const result = await addWeight(weightItem);
+		if (result.success) addUserWeight(result.data);
+		return result;
 	}
 }
 

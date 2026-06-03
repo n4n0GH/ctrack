@@ -6,6 +6,7 @@
 	import { Update } from '$lib/scripts/dataInit';
 
 	let weightValue = $derived(settings.currentWeight);
+	let submitError = $state('');
 	let latestWeight = userWeights.sort((a, b) => b.date.seconds - a.date.seconds)[0];
 	let visceralValue = $derived(latestWeight.visceral);
 	let bodyfatValue = $derived(latestWeight.fat);
@@ -31,7 +32,12 @@
 	};
 
 	const addWeightData = async () => {
-		await pushTo.weight(createWeightItem());
+		const result = await pushTo.weight(createWeightItem());
+		if (result.success) {
+			(document.getElementById('weightUpdateModal') as HTMLDialogElement)?.close();
+		} else {
+			submitError = 'Failed to submit weight data. Please try again.';
+		}
 	};
 </script>
 
@@ -64,6 +70,10 @@
 		Time
 		<input type="time" class="input" bind:value={time} />
 	</label>
+
+	{#if submitError}
+		<p class="text-error text-sm">{submitError}</p>
+	{/if}
 
 	<button class="btn btn-success w-full" onclick={() => addWeightData()}>Update Weight</button>
 </div>
