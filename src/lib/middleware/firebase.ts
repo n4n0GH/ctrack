@@ -91,9 +91,13 @@ export const getCalories = async (path: CalorieSelector) => {
  * @param path name of the calorie collection
  * @param updateItem object with updated fields
  */
-export const updateCalories = async (path: CalorieSelector, updateItem: EnergyItem) => {
+export const updateCalories = async (
+	path: CalorieSelector,
+	docId: string,
+	updateItem: EnergyItem
+) => {
 	let updateSuccess = false;
-	const docRef = doc(db, path);
+	const docRef = doc(db, path, docId);
 	await updateDoc(docRef, { name: updateItem.name, energyValue: updateItem.energyValue })
 		.then(() => {
 			updateSuccess = true;

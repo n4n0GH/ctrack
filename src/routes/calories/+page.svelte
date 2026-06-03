@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Container from '$lib/components/Container.svelte';
+	import CalorieEdit from '$lib/components/CalorieEdit.svelte';
 	import { calories } from '$lib/state/calories.svelte';
 	import { getAgeFactor, toHumanDate } from '$lib/scripts/helpers';
 	import { calorieGoal } from '$lib/scripts/calories';
@@ -8,6 +9,7 @@
 	import { LineChart, ScaleTypes } from '@carbon/charts-svelte';
 	import '@carbon/charts-svelte/styles.css';
 	import { activity } from '$lib/state/activityHistory.svelte';
+	import type { EnergyItem, CalorieSelector } from '$lib/data/types';
 
 	function groupCalories<K, V>(list: Array<V>, keyGetter: (input: V) => K): Map<K, Array<V>> {
 		const map = new Map();
@@ -49,50 +51,58 @@
 		};
 	});
 
-	let caloriesIn = calories.intake.map((item) => {
-		return {
-			id: item.id,
-			name: item.name,
-			energyValue: item.energyValue,
-			date: item.date,
-			type: 'intake'
-		};
-	});
+	let caloriesIn = $derived(
+		calories.intake.map((item) => {
+			return {
+				id: item.id,
+				name: item.name,
+				energyValue: item.energyValue,
+				date: item.date,
+				type: 'intake'
+			};
+		})
+	);
 
-	let caloriesOut = calories.burned.map((item) => {
-		return {
-			id: item.id,
-			name: item.name,
-			energyValue: item.energyValue,
-			date: item.date,
-			type: 'output'
-		};
-	});
+	let caloriesOut = $derived(
+		calories.burned.map((item) => {
+			return {
+				id: item.id,
+				name: item.name,
+				energyValue: item.energyValue,
+				date: item.date,
+				type: 'output'
+			};
+		})
+	);
 
-	let union = caloriesIn.concat(caloriesOut).sort((a, b) => b.date.seconds - a.date.seconds);
+	let union = $derived(
+		caloriesIn.concat(caloriesOut).sort((a, b) => b.date.seconds - a.date.seconds)
+	);
 
-	let sorted = groupCalories(union, (calorie) => toHumanDate(calorie.date.seconds));
+	let sorted = $derived(groupCalories(union, (calorie) => toHumanDate(calorie.date.seconds)));
 
-	let chartSorted = Array.from(sorted).map((item) => {
-		const totalValue = item[1].reduce((a: number, b: any) => {
-			if (b.type === 'intake') {
-				return a + b.energyValue;
-			} else {
-				return a - b.energyValue;
-			}
-		}, 0);
-		/* @dev we need to sanitize the output as the chart can't
+	let chartSorted = $derived(
+		Array.from(sorted).map((item) => {
+			const totalValue = item[1].reduce((a: number, b: any) => {
+				if (b.type === 'intake') {
+					return a + b.energyValue;
+				} else {
+					return a - b.energyValue;
+				}
+			}, 0);
+			/* @dev we need to sanitize the output as the chart can't
 		    display 0 values with LOG scaling and with enough burned
 			calories (i.e. exercise before eating anything)
 			it may cause negative values to appear and crash
 			the chart entirely
 		*/
-		return {
-			group: 'Daily Intake',
-			date: item[0],
-			value: totalValue >= 0 ? totalValue : 0.0001
-		};
-	});
+			return {
+				group: 'Daily Intake',
+				date: item[0],
+				value: totalValue >= 0 ? totalValue : 0.0001
+			};
+		})
+	);
 
 	let tdeeAverage = () => {
 		const totalTdee = chartDataTdee.reduce((a: any, b: any) => {
@@ -113,7 +123,18 @@
 	/*
 	 * @dev We want to remove "today" calories from the chart display
 	 */
-	let allData = chartSorted.slice(1).concat(chartDataWeights, chartDataTdee);
+	let allData = $derived(chartSorted.slice(1).concat(chartDataWeights, chartDataTdee));
+
+	let selectedEntry = $state<EnergyItem | null>(null);
+	let selectedPath = $state<CalorieSelector | null>(null);
+	let reInitModal = $state(Math.random());
+
+	const openEditModal = (item: EnergyItem, itemType: string) => {
+		selectedEntry = item;
+		selectedPath = itemType === 'intake' ? 'calorieIntake' : 'calorieBurn';
+		reInitModal = Math.random();
+		(document.getElementById('calorieEditModal') as HTMLDialogElement)?.showModal();
+	};
 
 	let chartOptions = {
 		axes: {
@@ -229,6 +250,19 @@
 		</div>
 	</div>
 </Container>
+
+<dialog id="calorieEditModal" class="modal modal-bottom sm:modal-middle">
+	<div class="modal-box">
+		{#key reInitModal}
+			{#if selectedEntry && selectedPath}
+				<CalorieEdit entry={selectedEntry} path={selectedPath} />
+			{/if}
+		{/key}
+	</div>
+	<form method="dialog" class="modal-backdrop">
+		<button>close</button>
+	</form>
+</dialog>
 <Container title="Details">
 	<div class="mx-4 my-2 w-full flex-row items-center justify-center">
 		{#each sorted as calorie}
@@ -251,6 +285,7 @@
 					{#each calorie[1] as item}
 						<button
 							class="hover:bg-base-300 inline-flex rounded border-l-amber-500 px-4 py-1 text-current/75 hover:cursor-pointer hover:border-l-8"
+							onclick={() => openEditModal(item, item.type)}
 						>
 							<p class="text-left">{item.name} ({item.id})</p>
 							<p

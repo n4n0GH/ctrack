@@ -45,7 +45,11 @@ export type UserSettings = {
 
 export type CalorieSelector = 'calorieBurn' | 'calorieIntake';
 
-export type ModalSelector = 'calorieAddModal' | 'calorieBurnModal' | 'weightUpdateModal';
+export type ModalSelector =
+	| 'calorieAddModal'
+	| 'calorieBurnModal'
+	| 'weightUpdateModal'
+	| 'calorieEditModal';
 
 export type BmiItem = {
 	label:

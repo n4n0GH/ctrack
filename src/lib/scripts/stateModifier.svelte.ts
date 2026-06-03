@@ -40,6 +40,17 @@ export const updateBurn = (newCalories: EnergyItem) => {
 	calories.burned.push(newCalories);
 };
 
+export const updateCalorieItem = (
+	path: 'calorieIntake' | 'calorieBurn',
+	updatedItem: EnergyItem
+) => {
+	const targetArray = path === 'calorieIntake' ? calories.intake : calories.burned;
+	const index = targetArray.findIndex((item) => (item as EnergyItem).id === updatedItem.id);
+	if (index !== -1) {
+		targetArray[index] = { ...targetArray[index], ...updatedItem };
+	}
+};
+
 export const initCalories = (dataset: {
 	intake: (EnergyItem | DocumentData)[];
 	burned: (EnergyItem | DocumentData)[];
