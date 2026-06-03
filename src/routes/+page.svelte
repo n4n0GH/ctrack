@@ -19,14 +19,14 @@
 		settings.activityFactor,
 		settings.deficit
 	);
-	let used = usedCalories(calories.intake);
-	let burned = usedCalories(calories.burned) * 0.75;
-	let delta = used - burned;
-	let usedCaloriesPercentage = (delta / goal) * 100;
-	let dailyDeficit = settings.deficit - deficitReduction(goal, delta, settings.deficit);
-	let deficitPercentage = (dailyDeficit / settings.deficit) * 100;
+	let used = $derived(usedCalories(calories.intake));
+	let burned = $derived(usedCalories(calories.burned) * 0.75);
+	let delta = $derived(used - burned);
+	let usedCaloriesPercentage = $derived((delta / goal) * 100);
+	let dailyDeficit = $derived(settings.deficit - deficitReduction(goal, delta, settings.deficit));
+	let deficitPercentage = $derived((dailyDeficit / settings.deficit) * 100);
 
-	let calorieColor =
+	let calorieColor = $derived(
 		usedCaloriesPercentage >= 120
 			? 2
 			: usedCaloriesPercentage >= 101
@@ -35,8 +35,9 @@
 					? 0
 					: usedCaloriesPercentage >= 50
 						? 1
-						: 2;
-	let deficitColor = deficitPercentage >= 75 ? 0 : deficitPercentage >= 45 ? 1 : 2;
+						: 2
+	);
+	let deficitColor = $derived(deficitPercentage >= 75 ? 0 : deficitPercentage >= 45 ? 1 : 2);
 
 	let reInitModal = $state(Math.random());
 
