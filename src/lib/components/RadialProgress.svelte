@@ -2,7 +2,7 @@
 	let { color = 0, percentage = 0 } = $props();
 
 	const ringColor = ['text-emerald-500', 'text-amber-500', 'text-rose-500'];
-	const sanitizedPercentage = Math.floor(percentage);
+	const sanitizedPercentage = $derived(Math.floor(percentage));
 </script>
 
 <div

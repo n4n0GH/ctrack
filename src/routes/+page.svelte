@@ -39,6 +39,8 @@
 	);
 	let deficitColor = $derived(deficitPercentage >= 75 ? 0 : deficitPercentage >= 45 ? 1 : 2);
 
+	let userWeight = $derived(settings.currentWeight);
+
 	let reInitModal = $state(Math.random());
 
 	/**
@@ -110,7 +112,7 @@
 				</div>
 				<div class="stat">
 					<div class="stat-value">
-						<span class="text-6xl md:text-8xl">{settings.currentWeight}</span>
+						<span class="text-6xl md:text-8xl">{userWeight}</span>
 						<span class="text-2xl md:text-4xl">KG</span>
 					</div>
 				</div>
