@@ -287,7 +287,7 @@
 							class="hover:bg-base-300 inline-flex rounded border-l-amber-500 px-4 py-1 text-current/75 hover:cursor-pointer hover:border-l-8"
 							onclick={() => openEditModal(item, item.type)}
 						>
-							<p class="text-left">{item.name} ({item.id})</p>
+							<p class="text-left">{item.name}</p>
 							<p
 								class="text-right {item.type === 'intake' ? 'text-amber-500' : 'text-emerald-500'}"
 							>
