@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import Container from '$lib/components/Container.svelte';
 	import WeightEdit from '$lib/components/WeightEdit.svelte';
 	import { LineChart, ScaleTypes } from '@carbon/charts-svelte';
@@ -9,30 +10,67 @@
 	import { getBmiLabel, getFatLevel } from '$lib/scripts/helpers';
 	import type { WeightItem } from '$lib/data/types';
 
-	let compareWeight = 0;
-	let weights = userWeights.sort((a, b) => b.date.seconds - a.date.seconds);
-	let comparedWeights = weights
-		.sort((a, b) => a.date.seconds - b.date.seconds)
-		.map((weight) => {
-			const change =
-				weight.weight > compareWeight ? 'up' : weight.weight < compareWeight ? 'down' : 'no';
-			const newDiff =
-				compareWeight === 0 ? 0 : (Math.round((compareWeight - weight.weight) * 10) / 10) * -1;
-			compareWeight = weight.weight;
-			return {
-				weight: weight.weight,
-				change: change,
-				diff: newDiff,
-				date: toHumanDate(weight.date.seconds),
-				timestamp: weight.date.seconds,
-				details: !!weight.fat || !!weight.muscle || !!weight.visceral,
-				fat: weight.fat || undefined,
-				muscle: weight.muscle || undefined,
-				visceral: weight.visceral || undefined,
-				id: (weight as WeightItem & { id: string }).id
-			};
-		})
-		.sort((a, b) => b.timestamp - a.timestamp);
+	// Lazy loading config
+	let visibleCount = $state(28);
+	const batchSize = 14;
+
+	const loadMore = () => {
+		visibleCount += batchSize;
+	};
+
+	// Full sorted weights array (used for non-reactive stats card)
+	let weights = $derived(userWeights.slice().sort((a, b) => b.date.seconds - a.date.seconds));
+
+	// Visible subset for list view and reactive chart
+	let visibleWeights = $derived(weights.slice(0, visibleCount));
+
+	let comparedWeights = $derived.by(() => {
+		let compareWeight = 0;
+		return visibleWeights
+			.slice()
+			.sort((a, b) => a.date.seconds - b.date.seconds)
+			.map((weight) => {
+				const change =
+					weight.weight > compareWeight ? 'up' : weight.weight < compareWeight ? 'down' : 'no';
+				const newDiff =
+					compareWeight === 0 ? 0 : (Math.round((compareWeight - weight.weight) * 10) / 10) * -1;
+				compareWeight = weight.weight;
+				return {
+					weight: weight.weight,
+					change: change,
+					diff: newDiff,
+					date: toHumanDate(weight.date.seconds),
+					timestamp: weight.date.seconds,
+					details: !!weight.fat || !!weight.muscle || !!weight.visceral,
+					fat: weight.fat || undefined,
+					muscle: weight.muscle || undefined,
+					visceral: weight.visceral || undefined,
+					id: (weight as WeightItem & { id: string }).id
+				};
+			})
+			.sort((a, b) => b.timestamp - a.timestamp);
+	});
+
+	// IntersectionObserver for lazy loading
+	let sentinelElement: HTMLElement;
+	let observer: IntersectionObserver;
+
+	onMount(() => {
+		observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0].isIntersecting && visibleCount < weights.length) {
+					loadMore();
+				}
+			},
+			{ rootMargin: '200px' }
+		);
+		if (sentinelElement) {
+			observer.observe(sentinelElement);
+		}
+		return () => {
+			observer.disconnect();
+		};
+	});
 
 	let selectedWeightEntry = $state<(WeightItem & { id: string }) | null>(null);
 	let reInitModal = $state(Math.random());
@@ -42,12 +80,14 @@
 		reInitModal = Math.random();
 		(document.getElementById('weightEditModal') as HTMLDialogElement)?.showModal();
 	};
-	let chartData = weights.map((weight) => {
-		return {
-			group: 'Weight',
-			date: new Date(weight.date.seconds * 1000).toISOString(),
-			value: weight.weight
-		};
+	let chartData = $derived.by(() => {
+		return visibleWeights.map((weight) => {
+			return {
+				group: 'Weight',
+				date: new Date(weight.date.seconds * 1000).toISOString(),
+				value: weight.weight
+			};
+		});
 	});
 	let weightDiff = {
 		value: Math.round((settings.highestWeight - settings.currentWeight) * 10) / 10,
@@ -324,6 +364,12 @@
 				</div>
 			</div>
 		{/each}
+		{#if visibleCount < weights.length}
+			<p class="mt-2 text-center text-current/50">Loading more...</p>
+		{:else}
+			<p class="mt-2 text-center text-current/50">End of history</p>
+		{/if}
+		<div bind:this={sentinelElement} class="h-1"></div>
 	</div>
 </Container>
 
