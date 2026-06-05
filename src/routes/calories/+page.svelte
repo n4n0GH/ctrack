@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount, onDestroy } from 'svelte';
 	import Container from '$lib/components/Container.svelte';
 	import CalorieEdit from '$lib/components/CalorieEdit.svelte';
 	import { calories } from '$lib/state/calories.svelte';
@@ -27,7 +28,18 @@
 
 	const ageFactor = getAgeFactor(settings.gender);
 
-	let sortedWeights = userWeights.sort((a, b) => b.date.seconds - a.date.seconds);
+	// === Pagination config ===
+	const INITIAL_LOAD_DAYS = 28;
+	const LOAD_MORE_DAYS = 14;
+
+	// === Pagination state ===
+	let visibleDaysCount = $state(INITIAL_LOAD_DAYS);
+	let sentinelElement: HTMLElement | null = null;
+	let observer: IntersectionObserver | null = null;
+
+	// === Weight data ===
+	let sortedWeights = userWeights.slice().sort((a, b) => b.date.seconds - a.date.seconds);
+
 	let chartDataWeights = sortedWeights.map((weight) => {
 		const caloricGoal = calorieGoal(
 			settings.age,
@@ -43,6 +55,7 @@
 			value: caloricGoal
 		};
 	});
+
 	let chartDataTdee = chartDataWeights.map((item) => {
 		return {
 			group: 'TDEE',
@@ -51,6 +64,7 @@
 		};
 	});
 
+	// === Calorie data ===
 	let caloriesIn = $derived(
 		calories.intake.map((item) => {
 			return {
@@ -81,8 +95,14 @@
 
 	let sorted = $derived(groupCalories(union, (calorie) => toHumanDate(calorie.date.seconds)));
 
+	// === Pagination: visible slice of all days ===
+	let allDays = $derived(Array.from(sorted));
+	let visibleDays = $derived(allDays.slice(0, visibleDaysCount));
+	let hasMoreData = $derived(visibleDaysCount < allDays.length);
+
+	// === Chart data (computed from all entries) ===
 	let chartSorted = $derived(
-		Array.from(sorted).map((item) => {
+		allDays.map((item) => {
 			const totalValue = item[1].reduce((a: number, b: any) => {
 				if (b.type === 'intake') {
 					return a + b.energyValue;
@@ -90,12 +110,9 @@
 					return a - b.energyValue;
 				}
 			}, 0);
-			/* @dev we need to sanitize the output as the chart can't
-		    display 0 values with LOG scaling and with enough burned
-			calories (i.e. exercise before eating anything)
-			it may cause negative values to appear and crash
-			the chart entirely
-		*/
+			/* @dev sanitize output: chart cannot display 0 values with LOG scaling
+			 * and negative values would crash the chart entirely
+			 */
 			return {
 				group: 'Daily Intake',
 				date: item[0],
@@ -104,27 +121,52 @@
 		})
 	);
 
+	// === Filter chart data to match currently visible entries ===
+	let visibleDateStrings = $derived(visibleDays.map(([date]) => date));
+
+	let filteredChartSorted = $derived(
+		chartSorted.filter((item) => visibleDateStrings.includes(item.date))
+	);
+
+	let filteredChartDataWeights = $derived(
+		chartDataWeights.filter((item) =>
+			visibleDateStrings.includes(new Date(item.date).toDateString())
+		)
+	);
+
+	let filteredChartTdee = $derived(
+		chartDataTdee.filter((item) => visibleDateStrings.includes(new Date(item.date).toDateString()))
+	);
+
+	/*
+	 * @dev Exclude "today" from chart display since daily data is still incomplete
+	 */
+	let todayDateString = toHumanDate(Math.floor(Date.now() / 1000));
+
+	let allVisibleData = $derived(
+		filteredChartSorted
+			.filter((item) => item.date !== todayDateString)
+			.concat(filteredChartDataWeights, filteredChartTdee)
+	);
+
+	// === Statistics based on visible data ===
 	let tdeeAverage = () => {
-		const totalTdee = chartDataTdee.reduce((a: any, b: any) => {
+		if (filteredChartTdee.length === 0) return 0;
+		const totalTdee = filteredChartTdee.reduce((a: any, b: any) => {
 			return a + b.value;
 		}, 0);
-		const averages = totalTdee / chartDataTdee.length;
-		return averages;
+		return totalTdee / filteredChartTdee.length;
 	};
 
 	let calorieAverage = () => {
-		const totalCalories = chartSorted.reduce((a: any, b: any) => {
+		if (filteredChartSorted.length === 0) return 0;
+		const totalCalories = filteredChartSorted.reduce((a: any, b: any) => {
 			return a + b.value;
 		}, 0);
-		const averages = totalCalories / chartSorted.length;
-		return averages;
+		return totalCalories / filteredChartSorted.length;
 	};
 
-	/*
-	 * @dev We want to remove "today" calories from the chart display
-	 */
-	let allData = $derived(chartSorted.slice(1).concat(chartDataWeights, chartDataTdee));
-
+	// === Modal state ===
 	let selectedEntry = $state<EnergyItem | null>(null);
 	let selectedPath = $state<CalorieSelector | null>(null);
 	let reInitModal = $state(Math.random());
@@ -136,6 +178,7 @@
 		(document.getElementById('calorieEditModal') as HTMLDialogElement)?.showModal();
 	};
 
+	// === Chart options ===
 	let chartOptions = {
 		axes: {
 			left: {
@@ -159,15 +202,39 @@
 		curve: 'curveMonotoneX',
 		height: '320px'
 	};
+
+	// === IntersectionObserver for lazy loading ===
+	onMount(() => {
+		observer = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((entry) => {
+					if (entry.isIntersecting && hasMoreData) {
+						visibleDaysCount += LOAD_MORE_DAYS;
+					}
+				});
+			},
+			{ rootMargin: '100px' }
+		);
+
+		if (sentinelElement) {
+			observer.observe(sentinelElement);
+		}
+	});
+
+	onDestroy(() => {
+		observer?.disconnect();
+	});
 </script>
 
 <svelte:head>
 	<title>CTrack - Calories</title>
 </svelte:head>
+
+<!-- Chart section - reflects visible entries only -->
 <Container title="Chart">
 	<div class="flex w-full flex-col gap-4 px-4 pb-4">
 		<div class="card card-border bg-base-100 w-full items-center justify-center p-4 shadow">
-			<LineChart options={chartOptions} data={allData}></LineChart>
+			<LineChart options={chartOptions} data={allVisibleData}></LineChart>
 		</div>
 		<div class="w-full items-center">
 			<div class="stats bg-base-100 flex self-center shadow">
@@ -184,7 +251,8 @@
 							<path
 								stroke-linecap="round"
 								stroke-linejoin="round"
-								d="M15.362 5.214A8.252 8.252 0 0 1 12 21 8.25 8.25 0 0 1 6.038 7.047 8.287 8.287 0 0 0 9 9.601a8.983 8.983 0 0 1 3.361-6.867 8.21 8.21 0 0 0 3 2.48Z"
+								d="M15.362 5.214A8.252 8.252 0 0 1 12 21 8.25 8.25 0 0 1 6.038 7.047 8.287 8.287 0 0 0 9 9.601a8.983
+ 8.983 0 0 1 3.361-6.867 8.21 8.21 0 0 0 3 2.48Z"
 							/>
 							<path
 								stroke-linecap="round"
@@ -243,7 +311,7 @@
 						</svg>
 					</div>
 					<div class="stat-title">Tracking</div>
-					<div class="stat-value">{chartSorted.length}</div>
+					<div class="stat-value">{visibleDays.length}</div>
 					<div class="stat-desc">Days</div>
 				</div>
 			</div>
@@ -263,9 +331,11 @@
 		<button>close</button>
 	</form>
 </dialog>
+
+<!-- Details section with lazy-loaded list -->
 <Container title="Details">
 	<div class="mx-4 my-2 w-full flex-row items-center justify-center">
-		{#each sorted as calorie}
+		{#each visibleDays as calorie}
 			<div class="card card-border bg-base-100 mb-3 shadow">
 				<div class="card-body gap-0">
 					<div class="mx-4 mb-2 inline-flex border-b border-dashed pb-2">
@@ -298,5 +368,12 @@
 				</div>
 			</div>
 		{/each}
+
+		<!-- Sentinel element for IntersectionObserver lazy loading -->
+		{#if hasMoreData}
+			<div class="my-4 flex items-center justify-center" bind:this={sentinelElement}>
+				<span class="loading loading-spinner loading-sm text-primary"></span>
+			</div>
+		{/if}
 	</div>
 </Container>
