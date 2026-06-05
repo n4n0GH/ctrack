@@ -57,7 +57,12 @@ export const getUserSettings = async () => {
 export const getUserWeight = async () => {
 	const weightCol = collection(db, 'weightHistory');
 	const weights = await getDocs(weightCol);
-	return weights.docs.map((doc) => doc.data());
+	return weights.docs.map((doc) => {
+		return {
+			id: doc.id,
+			...doc.data()
+		};
+	});
 };
 
 /**
@@ -130,6 +135,34 @@ export const addCalories = async (path: CalorieSelector, calorieItem: EnergyItem
 	return {
 		success: updateSuccess,
 		data: calorieItem
+	};
+};
+
+/**
+ * updates an existing document inside weightHistory collection
+ * @param docId the firebase document id
+ * @param updateItem object with updated fields
+ */
+export const updateWeight = async (docId: string, updateItem: WeightItem) => {
+	let updateSuccess = false;
+	const docRef = doc(db, 'weightHistory', docId);
+	await updateDoc(docRef, {
+		weight: updateItem.weight,
+		date: Timestamp.fromMillis(updateItem.date.seconds * 1000),
+		fat: updateItem.fat,
+		muscle: updateItem.muscle,
+		visceral: updateItem.visceral
+	})
+		.then(() => {
+			updateSuccess = true;
+		})
+		.catch((e) => {
+			console.error(e);
+			updateSuccess = false;
+		});
+	return {
+		success: updateSuccess,
+		data: { id: docId, ...updateItem }
 	};
 };
 

@@ -17,6 +17,7 @@ export type WeightItem = {
 	fat?: number | undefined;
 	muscle?: number | undefined;
 	visceral?: number | undefined;
+	id?: string | undefined;
 };
 
 export type ActivityHistoryItem = {

@@ -5,7 +5,8 @@ import {
 	getActivityHistory,
 	addCalories,
 	addWeight,
-	updateCalories
+	updateCalories,
+	updateWeight as updateWeightFb
 } from '$lib/middleware/firebase';
 import { findNewestWeight, findHighestWeight, findLowestWeight } from '$lib/scripts/helpers';
 import {
@@ -16,7 +17,8 @@ import {
 	updateBurn,
 	initCalories,
 	initActivityHistory,
-	updateCalorieItem
+	updateCalorieItem,
+	updateWeightItem
 } from '$lib/scripts/stateModifier.svelte';
 import { calories } from '$lib/state/calories.svelte';
 import type {
@@ -90,6 +92,13 @@ export class Update {
 		const result = await updateCalories(path, docId, updateItem);
 		if (result.success) {
 			updateCalorieItem(path, result.data);
+		}
+		return result;
+	}
+	async updateWeight(docId: string, updateItem: WeightItem) {
+		const result = await updateWeightFb(docId, updateItem);
+		if (result.success) {
+			updateWeightItem(result.data);
 		}
 		return result;
 	}

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Container from '$lib/components/Container.svelte';
+	import WeightEdit from '$lib/components/WeightEdit.svelte';
 	import { LineChart, ScaleTypes } from '@carbon/charts-svelte';
 	import '@carbon/charts-svelte/styles.css';
 	import { userWeights } from '$lib/state/weight.svelte';
@@ -27,10 +28,20 @@
 				details: !!weight.fat || !!weight.muscle || !!weight.visceral,
 				fat: weight.fat || undefined,
 				muscle: weight.muscle || undefined,
-				visceral: weight.visceral || undefined
+				visceral: weight.visceral || undefined,
+				id: (weight as WeightItem & { id: string }).id
 			};
 		})
 		.sort((a, b) => b.timestamp - a.timestamp);
+
+	let selectedWeightEntry = $state<(WeightItem & { id: string }) | null>(null);
+	let reInitModal = $state(Math.random());
+
+	const openEditModal = (item: WeightItem & { id: string }) => {
+		selectedWeightEntry = item;
+		reInitModal = Math.random();
+		(document.getElementById('weightEditModal') as HTMLDialogElement)?.showModal();
+	};
 	let chartData = weights.map((weight) => {
 		return {
 			group: 'Weight',
@@ -233,10 +244,37 @@
 <Container title="Details">
 	<div class="mx-4 my-2 w-full flex-row items-center justify-center">
 		{#each comparedWeights as weight}
-			<div class="card card-border bg-base-100 mb-3 shadow">
+			<div class="card card-border bg-base-100 group mb-3 shadow">
 				<div class="card-body">
 					<div class="inline-flex border-b border-dashed">
-						<p class="text-xl">{weight.date}</p>
+						<div class="flex items-center gap-2">
+							<p class="text-xl">{weight.date}</p>
+							<button
+								class="btn btn-xs btn-ghost opacity-0 transition-opacity group-hover:opacity-100"
+								aria-label="Edit weight entry"
+								onclick={() =>
+									openEditModal(
+										weights.find(
+											(w) => (w as WeightItem & { id: string }).id === weight.id
+										)! as WeightItem & { id: string }
+									)}
+							>
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke-width="1.5"
+									stroke="currentColor"
+									class="size-4"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+									/>
+								</svg>
+							</button>
+						</div>
 						<p class="text-right text-xl">
 							{weight.weight} KG
 						</p>
@@ -288,3 +326,16 @@
 		{/each}
 	</div>
 </Container>
+
+<dialog id="weightEditModal" class="modal modal-bottom sm:modal-middle">
+	<div class="modal-box">
+		{#key reInitModal}
+			{#if selectedWeightEntry}
+				<WeightEdit entry={selectedWeightEntry} />
+			{/if}
+		{/key}
+	</div>
+	<form method="dialog" class="modal-backdrop">
+		<button>close</button>
+	</form>
+</dialog>

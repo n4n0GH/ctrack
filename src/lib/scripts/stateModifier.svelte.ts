@@ -30,6 +30,17 @@ export const initUserWeight = (dataset: (WeightItem | DocumentData)[]) => {
 	userWeights.push(...dataset);
 };
 
+/* == Weight Related (Update) == */
+
+export const updateWeightItem = (updatedItem: WeightItem) => {
+	const index = userWeights.findIndex(
+		(item) => (item as WeightItem).date.seconds === updatedItem.date.seconds
+	);
+	if (index !== -1) {
+		userWeights[index] = { ...userWeights[index], ...updatedItem };
+	}
+};
+
 /* == Calorie Related == */
 
 export const updateIntake = (newCalories: EnergyItem) => {
