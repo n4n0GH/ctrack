@@ -231,7 +231,7 @@
 </svelte:head>
 
 <!-- Chart section - reflects visible entries only -->
-<Container title="Chart">
+<Container title="Chart" sticky={true}>
 	<div class="flex w-full flex-col gap-4 px-4 pb-4">
 		<div class="card card-border bg-base-100 w-full items-center justify-center p-4 shadow">
 			<LineChart options={chartOptions} data={allVisibleData}></LineChart>
