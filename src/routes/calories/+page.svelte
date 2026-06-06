@@ -34,7 +34,7 @@
 
 	// === Pagination state ===
 	let visibleDaysCount = $state(INITIAL_LOAD_DAYS);
-	let sentinelElement: HTMLElement | null = null;
+	let sentinelElement: HTMLElement | null = $state(null);
 	let observer: IntersectionObserver | null = null;
 
 	// === Weight data ===

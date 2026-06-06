@@ -1,9 +1,31 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
+	import { fly } from 'svelte/transition';
 
 	import '../app.css';
 	let { children } = $props();
+
+	const routes = ['/', '/calories', '/weight', '/settings'];
+	let direction = $state(1);
+
+	let navigating = $state(false);
+
+	const navigate = (path: string) => {
+		if (navigating) return;
+
+		const currentIndex = routes.indexOf(page.url.pathname);
+		const targetIndex = routes.indexOf(path);
+
+		if (currentIndex !== -1 && targetIndex !== -1 && currentIndex !== targetIndex) {
+			direction = targetIndex > currentIndex ? 1 : -1;
+		}
+
+		navigating = true;
+		goto(path).finally(() => {
+			navigating = false;
+		});
+	};
 
 	const isPath = (path: string) => {
 		const cwp = page.url.pathname;
@@ -11,11 +33,19 @@
 	};
 </script>
 
-<div class="mb-20">
-	{@render children()}
+<div class="transition-container">
+	{#key page.url.pathname}
+		<div
+			class="transition-content"
+			in:fly={{ duration: 250, x: direction * 100 }}
+			out:fly={{ duration: 250, x: direction * -100 }}
+		>
+			{@render children()}
+		</div>
+	{/key}
 </div>
 <div class="dock dock-lg">
-	<button onclick={() => goto('/')} class:dock-active={isPath('/')}>
+	<button onclick={() => navigate('/')} class:dock-active={isPath('/')}>
 		<svg
 			xmlns="http://www.w3.org/2000/svg"
 			fill="none"
@@ -34,7 +64,7 @@
 		<span class="dock-label">Overview</span>
 	</button>
 
-	<button onclick={() => goto('/calories')} class:dock-active={isPath('/calories')}>
+	<button onclick={() => navigate('/calories')} class:dock-active={isPath('/calories')}>
 		<svg
 			xmlns="http://www.w3.org/2000/svg"
 			fill="none"
@@ -57,7 +87,7 @@
 
 		<span class="dock-label">Calories</span>
 	</button>
-	<button onclick={() => goto('/weight')} class:dock-active={isPath('/weight')}>
+	<button onclick={() => navigate('/weight')} class:dock-active={isPath('/weight')}>
 		<svg
 			xmlns="http://www.w3.org/2000/svg"
 			fill="none"
@@ -80,7 +110,7 @@
 
 		<span class="dock-label">Weight</span>
 	</button>
-	<button onclick={() => goto('/settings')} class:dock-active={isPath('/settings')}>
+	<button onclick={() => navigate('/settings')} class:dock-active={isPath('/settings')}>
 		<svg
 			xmlns="http://www.w3.org/2000/svg"
 			fill="none"
@@ -99,3 +129,17 @@
 		<span class="dock-label">Settings</span>
 	</button>
 </div>
+
+<style>
+	.transition-container {
+		position: relative;
+		min-height: calc(100vh - 180px);
+	}
+
+	.transition-content {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+	}
+</style>
