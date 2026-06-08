@@ -159,4 +159,18 @@
 		   inset) so the end of every page stays reachable above the navbar. */
 		padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
 	}
+
+	/* When installed to the home screen there is no browser chrome or bottom URL
+	   bar, so the dock should sit flush against the screen edge instead of
+	   reserving the safe-area inset daisyUI adds for the in-browser case. */
+	@media (display-mode: standalone) {
+		:global(.dock) {
+			height: 4.5rem;
+			padding-bottom: 0;
+		}
+
+		.transition-content {
+			padding-bottom: 5.5rem;
+		}
+	}
 </style>
