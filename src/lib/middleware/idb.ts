@@ -492,6 +492,9 @@ export const syncFromFirebase = async (): Promise<{
 		synced: false
 	};
 
+	// Nothing to pull when Firebase isn't configured.
+	if (!fb.firebaseEnabled) return results;
+
 	// Helper to clear a store entirely
 	const clearStore = async (storeName: StoreName): Promise<void> => {
 		const db = await openDb();
@@ -592,6 +595,12 @@ export const fullSyncFromFirebase = async (): Promise<{
 	}
 	// Lazy import to avoid circular dependency issues at module load time
 	const fb = await import('$lib/middleware/firebase');
+
+	// Guard *before* wiping anything: with Firebase unconfigured there is no
+	// source to repopulate from, so clearing would just destroy local data.
+	if (!fb.firebaseEnabled) {
+		return { settings: 0, weights: 0, intake: 0, burn: 0, activity: 0, failedCollections: [] };
+	}
 
 	// Wipe all local data before pulling fresh data from Firebase
 	await clearAllStores();

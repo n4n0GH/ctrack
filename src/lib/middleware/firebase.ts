@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import {
 	getFirestore,
+	type Firestore,
 	collection,
 	doc,
 	getDocs,
@@ -9,14 +10,10 @@ import {
 	updateDoc,
 	Timestamp
 } from 'firebase/firestore/lite';
-import {
-	PUBLIC_API_KEY,
-	PUBLIC_AUTH_DOMAIN,
-	PUBLIC_PROJECT_ID,
-	PUBLIC_STORAGE_BUCKET,
-	PUBLIC_MESSAGE_SENDER_ID,
-	PUBLIC_APP_ID
-} from '$env/static/public';
+// Read via the dynamic public env so a build with no Firebase credentials does
+// not fail (a missing `$env/static/public` member is a hard build error). When
+// PUBLIC_API_KEY is absent the app runs entirely on IndexedDB.
+import { env } from '$env/dynamic/public';
 
 import type {
 	CalorieSelector,
@@ -25,6 +22,13 @@ import type {
 	ActivityHistoryItem,
 	UserSettings
 } from '$lib/data/types';
+
+/**
+ * Whether Firebase is configured for this build. Derived from the presence of a
+ * public API key; when false the data layer never initialises or calls Firestore
+ * and operates as an IndexedDB-only store.
+ */
+export const firebaseEnabled = Boolean(env.PUBLIC_API_KEY);
 
 /**
  * Returns the document count for a given collection in Firebase.
@@ -40,16 +44,18 @@ export const getCollectionCount = async (collectionName: string): Promise<number
 };
 
 const firebaseConfig = {
-	apiKey: PUBLIC_API_KEY,
-	authDomain: PUBLIC_AUTH_DOMAIN,
-	projectId: PUBLIC_PROJECT_ID,
-	storageBucker: PUBLIC_STORAGE_BUCKET,
-	messagingSenderId: PUBLIC_MESSAGE_SENDER_ID,
-	appId: PUBLIC_APP_ID
+	apiKey: env.PUBLIC_API_KEY,
+	authDomain: env.PUBLIC_AUTH_DOMAIN,
+	projectId: env.PUBLIC_PROJECT_ID,
+	storageBucket: env.PUBLIC_STORAGE_BUCKET,
+	messagingSenderId: env.PUBLIC_MESSAGE_SENDER_ID,
+	appId: env.PUBLIC_APP_ID
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+// Only initialise Firebase when it is configured. The cast keeps the helpers
+// below simply typed — they are only ever reached when `firebaseEnabled` is
+// true, since the storage layer guards every Firestore call.
+const db = (firebaseEnabled ? getFirestore(initializeApp(firebaseConfig)) : null) as Firestore;
 
 /**
  * Exposes Firebase timestamping util to the application

@@ -20,14 +20,20 @@ import type {
 
 // ======================== Firebase availability ========================
 
-let isFirebaseAvailable = true;
+// Starts false when Firebase isn't configured for this build, so every code
+// path below stays on the IndexedDB-only track and never touches Firestore.
+let isFirebaseAvailable = fb.firebaseEnabled;
 
 /**
  * Attempts to ping Firebase. Sets the availability flag used by the
  * fallback wrapper. Returns true when Firebase is reachable and false
- * when it has thrown (e.g. quota exceeded).
+ * when it is unconfigured or has thrown (e.g. quota exceeded).
  */
 export const checkFirebase = async (): Promise<boolean> => {
+	if (!fb.firebaseEnabled) {
+		isFirebaseAvailable = false;
+		return false;
+	}
 	try {
 		await fb.getUserSettings();
 		isFirebaseAvailable = true;
@@ -128,9 +134,10 @@ const readRemote = async (): Promise<InitialData> => {
  */
 export const loadInitialData = async (): Promise<InitialData> => {
 	// On the server there is no IndexedDB, so fall back to a best-effort
-	// Firebase read (which itself swallows quota errors).
+	// Firebase read (which itself swallows quota errors). With Firebase disabled
+	// there is nothing to read server-side, so return empty.
 	if (!browser) {
-		return readRemote();
+		return fb.firebaseEnabled ? readRemote() : EMPTY_INITIAL_DATA;
 	}
 
 	// 1. Local first — guaranteed to produce a renderable UI.
@@ -243,6 +250,9 @@ const tryFirebaseWrite = async (
 	write: () => Promise<{ success: boolean }>,
 	op: OutboxOperation
 ): Promise<boolean> => {
+	// Firebase not configured: IndexedDB is the source of truth, so there is
+	// nothing to push and nothing to queue for a later retry.
+	if (!fb.firebaseEnabled) return false;
 	if (!isFirebaseAvailable) {
 		await enqueueAndMarkDown(op);
 		return false;
@@ -349,7 +359,7 @@ export const updateWeight = async (docId: string, updateItem: WeightItem) => {
  * Never throws.
  */
 export const flushOutbox = async (): Promise<{ flushed: number; remaining: number }> => {
-	if (!browser) return { flushed: 0, remaining: 0 };
+	if (!browser || !fb.firebaseEnabled) return { flushed: 0, remaining: 0 };
 
 	let entries;
 	try {
@@ -424,6 +434,8 @@ export const syncToFirebase = async (): Promise<{
 		activity: 0
 	};
 
+	if (!fb.firebaseEnabled) return results;
+
 	const settings = await idb.getUserSettings();
 	if (settings) {
 		try {
@@ -468,9 +480,10 @@ export const syncToFirebase = async (): Promise<{
 };
 
 /**
- * Exposes the timestamp helper from Firebase for date creation
+ * Exposes the timestamp helper from Firebase for date creation, and the
+ * build-time flag indicating whether Firebase is configured at all.
  */
-export { getFbTime } from '$lib/middleware/firebase';
+export { getFbTime, firebaseEnabled } from '$lib/middleware/firebase';
 
 /**
  * Exposes IndexedDB-specific utilities for local data management

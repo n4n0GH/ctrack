@@ -11,7 +11,8 @@
 		updateUserSettings,
 		flushOutbox,
 		exportDatabase,
-		importDatabase
+		importDatabase,
+		firebaseEnabled
 	} from '$lib/middleware/storage';
 	import type { BackupFile } from '$lib/middleware/storage';
 	import { activityLevels, goalOptions } from '$lib/data/options';
@@ -355,25 +356,31 @@
 		{/snippet}
 	</Container>
 	<Container title="Data Handling">
-		<div role="alert" class="alert alert-warning mx-auto">
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				class="h-6 w-6 shrink-0 stroke-current"
-				fill="none"
-				viewBox="0 0 24 24"
-			>
-				<path
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					stroke-width="2"
-					d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-				/>
-			</svg>
-			<span
-				>Warning: Syncing will overwrite all existing IndexedDB entries with whatever is located
-				inside the Firebase DB!</span
-			>
-		</div>
+		{#if firebaseEnabled}
+			<div role="alert" class="alert alert-warning mx-auto">
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="h-6 w-6 shrink-0 stroke-current"
+					fill="none"
+					viewBox="0 0 24 24"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+					/>
+				</svg>
+				<span
+					>Warning: Syncing will overwrite all existing IndexedDB entries with whatever is located
+					inside the Firebase DB!</span
+				>
+			</div>
+		{:else}
+			<div role="alert" class="alert alert-info mx-auto">
+				<span>Firebase is not configured — all data is stored locally on this device only.</span>
+			</div>
+		{/if}
 		{#if syncSuccess && syncResult}
 			<div role="alert" class="alert alert-success mx-auto mt-2">
 				<svg
@@ -501,33 +508,35 @@
 			</div>
 		{/if}
 		{#snippet clickable()}
-			<button class="btn btn-soft btn-success grow" onclick={handleSync} disabled={syncing}>
-				{#if syncing}
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-5 w-5 animate-spin"
-						fill="none"
-						viewBox="0 0 24 24"
-					>
-						<circle
-							class="opacity-25"
-							cx="12"
-							cy="12"
-							r="10"
-							stroke="currentColor"
-							stroke-width="4"
-						/>
-						<path
-							class="opacity-75"
-							fill="currentColor"
-							d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-						/>
-					</svg>
-					Syncing...
-				{:else}
-					Sync to IndexedDB
-				{/if}
-			</button>
+			{#if firebaseEnabled}
+				<button class="btn btn-soft btn-success grow" onclick={handleSync} disabled={syncing}>
+					{#if syncing}
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5 animate-spin"
+							fill="none"
+							viewBox="0 0 24 24"
+						>
+							<circle
+								class="opacity-25"
+								cx="12"
+								cy="12"
+								r="10"
+								stroke="currentColor"
+								stroke-width="4"
+							/>
+							<path
+								class="opacity-75"
+								fill="currentColor"
+								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+							/>
+						</svg>
+						Syncing...
+					{:else}
+						Sync to IndexedDB
+					{/if}
+				</button>
+			{/if}
 			<button
 				class="btn btn-soft btn-success grow"
 				onclick={handlePersist}
@@ -559,33 +568,35 @@
 					Persist to IndexedDB
 				{/if}
 			</button>
-			<button class="btn btn-soft btn-warning grow" onclick={handleRetry} disabled={retrying}>
-				{#if retrying}
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-5 w-5 animate-spin"
-						fill="none"
-						viewBox="0 0 24 24"
-					>
-						<circle
-							class="opacity-25"
-							cx="12"
-							cy="12"
-							r="10"
-							stroke="currentColor"
-							stroke-width="4"
-						/>
-						<path
-							class="opacity-75"
-							fill="currentColor"
-							d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-						/>
-					</svg>
-					Retrying...
-				{:else}
-					Retry Failed Syncs
-				{/if}
-			</button>
+			{#if firebaseEnabled}
+				<button class="btn btn-soft btn-warning grow" onclick={handleRetry} disabled={retrying}>
+					{#if retrying}
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5 animate-spin"
+							fill="none"
+							viewBox="0 0 24 24"
+						>
+							<circle
+								class="opacity-25"
+								cx="12"
+								cy="12"
+								r="10"
+								stroke="currentColor"
+								stroke-width="4"
+							/>
+							<path
+								class="opacity-75"
+								fill="currentColor"
+								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+							/>
+						</svg>
+						Retrying...
+					{:else}
+						Retry Failed Syncs
+					{/if}
+				</button>
+			{/if}
 		{/snippet}
 	</Container>
 	<Container title="Backup & Restore">
