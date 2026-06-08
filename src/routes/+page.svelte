@@ -108,7 +108,7 @@
 				<div class="stat items-end font-mono">
 					<div class="stat-desc text-right">ATH: {settings.highestWeight}</div>
 					<div class="stat-desc text-right">ATL: {settings.lowestWeight}</div>
-					<div class="stat-desc text-right">MODE: {settings.targetIsLoss ? 'LOSS' : 'GAIN'}</div>
+					<div class="stat-desc text-right">MODE: {settings.goal.toUpperCase()}</div>
 				</div>
 				<div class="stat">
 					<div class="stat-value">

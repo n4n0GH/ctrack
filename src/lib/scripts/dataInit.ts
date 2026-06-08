@@ -129,6 +129,6 @@ const initSettings = (
 		highestWeight: weights.ath,
 		gender: settings.gender,
 		deficit: settings.deficit,
-		targetIsLoss: settings.targetIsLoss
+		goal: settings.goal
 	};
 };

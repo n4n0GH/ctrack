@@ -10,5 +10,5 @@ export let settings = $state<UserSettings>({
 	highestWeight: 0,
 	gender: 'male',
 	deficit: 0,
-	targetIsLoss: false
+	goal: 'maintain'
 });

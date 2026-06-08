@@ -272,6 +272,36 @@ export const addWeight = async (newWeight: WeightItem) => {
 	}
 };
 
+/**
+ * Persists user settings local-first: writes to IndexedDB so the change always
+ * survives a reload, then best-effort pushes to Firebase when it is reachable.
+ * Never throws — a failed Firebase write does not block saving locally.
+ *
+ * @returns success reflects whether the settings were persisted locally.
+ */
+export const updateUserSettings = async (
+	settings: UserSettings
+): Promise<{ success: boolean; data: UserSettings }> => {
+	let localSaved = false;
+	try {
+		await idb.saveUserSettings(settings);
+		localSaved = true;
+	} catch (e) {
+		console.warn('Failed to persist settings locally:', e);
+	}
+
+	if (isFirebaseAvailable) {
+		try {
+			await fb.updateUserSettings(settings);
+		} catch (e) {
+			console.warn('Failed to persist settings to Firebase:', e);
+			isFirebaseAvailable = false;
+		}
+	}
+
+	return { success: localSaved, data: settings };
+};
+
 export const updateWeight = async (docId: string, updateItem: WeightItem) => {
 	if (!isFirebaseAvailable) {
 		return idb.updateWeight(docId, updateItem);
@@ -319,8 +349,7 @@ export const syncToFirebase = async (): Promise<{
 	const settings = await idb.getUserSettings();
 	if (settings) {
 		try {
-			// Note: Firebase doesn't have a direct settings update in the current middleware,
-			// so this is primarily for future use when settings writes are added.
+			await fb.updateUserSettings(settings);
 			results.settings = 1;
 		} catch {
 			// Firebase may still be down

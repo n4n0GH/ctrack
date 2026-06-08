@@ -2,11 +2,12 @@ import { loadInitialData } from '$lib/middleware/storage';
 import { findNewestWeight, findLowestWeight, findHighestWeight } from '$lib/scripts/helpers';
 import { markDataLoaded } from '$lib/scripts/stateModifier.svelte';
 import { Update, Init } from '$lib/scripts/dataInit';
+import type { UserGoal, UserSettings } from '$lib/data/types';
 
 const init = new Init();
 const pushTo = new Update();
 
-const defaultSettings = {
+const defaultSettings: UserSettings = {
 	activityFactor: 1.2,
 	age: 30,
 	currentWeight: 0,
@@ -14,9 +15,19 @@ const defaultSettings = {
 	lowestWeight: 0,
 	height: 170,
 	highestWeight: 0,
-	gender: 'male' as const,
+	gender: 'male',
 	deficit: 500,
-	targetIsLoss: true
+	goal: 'loss'
+};
+
+/**
+ * Normalizes the persisted goal. Records written before the `goal` field
+ * existed only carry the legacy boolean `targetIsLoss`, so fall back to that.
+ */
+const resolveGoal = (raw: UserSettings): UserGoal => {
+	const legacy = raw as { goal?: UserGoal; targetIsLoss?: boolean };
+	if (legacy.goal) return legacy.goal;
+	return legacy.targetIsLoss === false ? 'gain' : 'loss';
 };
 
 export const load = async () => {
@@ -43,7 +54,7 @@ export const load = async () => {
 			highestWeight: athWeight.weight,
 			gender: fsettings.gender,
 			deficit: fsettings.deficit,
-			targetIsLoss: fsettings.targetIsLoss
+			goal: resolveGoal(fsettings)
 		};
 
 		pushTo.settings(newSettings);

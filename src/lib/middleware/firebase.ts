@@ -17,7 +17,13 @@ import {
 	PUBLIC_APP_ID
 } from '$env/static/public';
 
-import type { CalorieSelector, EnergyItem, WeightItem, ActivityHistoryItem } from '$lib/data/types';
+import type {
+	CalorieSelector,
+	EnergyItem,
+	WeightItem,
+	ActivityHistoryItem,
+	UserSettings
+} from '$lib/data/types';
 
 /**
  * Returns the document count for a given collection in Firebase.
@@ -61,6 +67,41 @@ export const getUserSettings = async () => {
 	const settingsCol = collection(db, 'userSettings');
 	const settings = await getDocs(settingsCol);
 	return settings.docs.map((doc) => doc.data())[0];
+};
+
+/**
+ * Persists the user settings to Firebase. Updates the existing settings
+ * document when one is present, otherwise creates it. Only the user-editable
+ * fields are written — derived weight figures are recomputed on load.
+ * @param settings the settings object to persist
+ * @returns an object with the success status and data
+ */
+export const updateUserSettings = async (settings: UserSettings) => {
+	let updateSuccess = false;
+	const payload = {
+		activityFactor: settings.activityFactor,
+		age: settings.age,
+		gender: settings.gender,
+		height: settings.height,
+		deficit: settings.deficit,
+		startingWeight: settings.startingWeight,
+		goal: settings.goal
+	};
+	try {
+		const settingsCol = collection(db, 'userSettings');
+		const snapshot = await getDocs(settingsCol);
+		if (snapshot.docs.length > 0) {
+			const docRef = doc(db, 'userSettings', snapshot.docs[0].id);
+			await updateDoc(docRef, payload);
+		} else {
+			await addDoc(settingsCol, payload);
+		}
+		updateSuccess = true;
+	} catch (e) {
+		console.error(e);
+		updateSuccess = false;
+	}
+	return { success: updateSuccess, data: settings };
 };
 
 /**

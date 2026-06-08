@@ -31,6 +31,8 @@ export type SortedWeights = {
 	atl: number;
 };
 
+export type UserGoal = 'loss' | 'gain' | 'maintain';
+
 export type UserSettings = {
 	activityFactor: number;
 	age: number;
@@ -41,7 +43,7 @@ export type UserSettings = {
 	highestWeight: number;
 	lowestWeight: number;
 	startingWeight: number;
-	targetIsLoss: boolean;
+	goal: UserGoal;
 };
 
 export type CalorieSelector = 'calorieBurn' | 'calorieIntake';

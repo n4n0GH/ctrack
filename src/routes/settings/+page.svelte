@@ -3,9 +3,76 @@
 	import { userWeights } from '$lib/state/weight.svelte';
 	import { calories } from '$lib/state/calories.svelte';
 	import { activity } from '$lib/state/activityHistory.svelte';
-	import { dataLoaded } from '$lib/scripts/stateModifier.svelte';
+	import { dataLoaded, updateSettings } from '$lib/scripts/stateModifier.svelte';
 	import Container from '$lib/components/Container.svelte';
-	import { fullSyncFromFirebase, persistInMemoryToIndexedDB } from '$lib/middleware/storage';
+	import {
+		fullSyncFromFirebase,
+		persistInMemoryToIndexedDB,
+		updateUserSettings
+	} from '$lib/middleware/storage';
+	import { activityLevels, goalOptions } from '$lib/data/options';
+	import type { UserGoal, UserSettings } from '$lib/data/types';
+
+	// Local, editable copy of the user-configurable settings. Derived fields
+	// (current/highest/lowest weight) are intentionally omitted — they are
+	// computed from weight history, not edited here.
+	let form = $state<{
+		age: number;
+		height: number;
+		startingWeight: number;
+		gender: 'male' | 'female';
+		activityFactor: number;
+		deficit: number;
+		goal: UserGoal;
+	}>({
+		age: settings.age,
+		height: settings.height,
+		startingWeight: settings.startingWeight,
+		gender: settings.gender,
+		activityFactor: settings.activityFactor,
+		deficit: settings.deficit,
+		goal: settings.goal
+	});
+
+	let savingSettings = $state(false);
+	let settingsSaved = $state(false);
+	let settingsError = $state(false);
+
+	async function handleSettingsSave() {
+		savingSettings = true;
+		settingsSaved = false;
+		settingsError = false;
+
+		try {
+			// Preserve the derived/computed fields already in state, overriding
+			// only the values the user can edit on this form.
+			const updated: UserSettings = {
+				...$state.snapshot(settings),
+				age: Number(form.age),
+				height: Number(form.height),
+				startingWeight: Number(form.startingWeight),
+				gender: form.gender,
+				activityFactor: Number(form.activityFactor),
+				deficit: Number(form.deficit),
+				goal: form.goal
+			};
+
+			// Update reactive state first so BMR/TDEE recalculate immediately,
+			// then persist local-first with a best-effort push to Firebase.
+			updateSettings(updated);
+			const result = await updateUserSettings(updated);
+			if (result.success) {
+				settingsSaved = true;
+			} else {
+				settingsError = true;
+			}
+		} catch (e) {
+			console.error('Failed to save settings:', e);
+			settingsError = true;
+		} finally {
+			savingSettings = false;
+		}
+	}
 
 	let syncing = $state(false);
 	let syncSuccess = $state(false);
@@ -82,38 +149,118 @@
 </svelte:head>
 <div class="flex flex-wrap">
 	<Container title="User Settings">
-		<div role="none" class="stats stats-vertical grow">
-			<div class="stat">
-				<div class="stat-title">Age</div>
-				<div class="stat-value">{settings.age} years</div>
+		<form
+			class="flex w-full flex-col gap-4 px-4 pb-2"
+			onsubmit={(e) => {
+				e.preventDefault();
+				handleSettingsSave();
+			}}
+		>
+			<label class="floating-label">
+				<span>Age (years)</span>
+				<input
+					type="number"
+					min="0"
+					max="120"
+					class="input input-bordered w-full"
+					placeholder="Age (years)"
+					bind:value={form.age}
+				/>
+			</label>
+
+			<label class="floating-label">
+				<span>Height (cm)</span>
+				<input
+					type="number"
+					min="0"
+					max="260"
+					class="input input-bordered w-full"
+					placeholder="Height (cm)"
+					bind:value={form.height}
+				/>
+			</label>
+
+			<label class="floating-label">
+				<span>Starting Weight (kg)</span>
+				<input
+					type="number"
+					min="0"
+					max="500"
+					step="0.1"
+					class="input input-bordered w-full"
+					placeholder="Starting Weight (kg)"
+					bind:value={form.startingWeight}
+				/>
+			</label>
+
+			<label class="floating-label">
+				<span>Gender</span>
+				<select class="select select-bordered w-full" bind:value={form.gender}>
+					<option value="male">Male</option>
+					<option value="female">Female</option>
+				</select>
+			</label>
+
+			<label class="floating-label">
+				<span>Activity Level</span>
+				<select class="select select-bordered w-full" bind:value={form.activityFactor}>
+					{#each activityLevels as level (level.value)}
+						<option value={level.value}>{level.label}</option>
+					{/each}
+				</select>
+			</label>
+
+			<label class="floating-label">
+				<span>User Goal</span>
+				<select class="select select-bordered w-full" bind:value={form.goal}>
+					{#each goalOptions as option (option.value)}
+						<option value={option.value}>{option.label}</option>
+					{/each}
+				</select>
+			</label>
+
+			<div class="w-full">
+				<div class="mb-1 flex justify-between text-sm">
+					<span>Daily Deficit</span>
+					<span class="font-mono">{form.deficit} kcal</span>
+				</div>
+				<input
+					type="range"
+					min="0"
+					max="1000"
+					step="10"
+					class="range range-success w-full"
+					bind:value={form.deficit}
+				/>
+				<div class="mt-1 flex justify-between text-xs opacity-60">
+					<span>0</span>
+					<span>1000</span>
+				</div>
 			</div>
-			<div class="stat">
-				<div class="stat-title">Height</div>
-				<div class="stat-value">{settings.height} cm</div>
-			</div>
-			<div class="stat">
-				<div class="stat-title">Gender</div>
-				<div class="stat-value">{settings.gender}</div>
-			</div>
-			<div class="stat">
-				<div class="stat-title">Deficit</div>
-				<div class="stat-value">{settings.deficit} kcal</div>
-			</div>
-			<div class="stat">
-				<div class="stat-title">Starting Weight</div>
-				<div class="stat-value">{settings.startingWeight} kg</div>
-			</div>
-			<div class="stat">
-				<div class="stat-title">Activity Factor</div>
-				<div class="stat-value">{settings.activityFactor}</div>
-			</div>
-			<div class="stat">
-				<div class="stat-title">User Goal</div>
-				<div class="stat-value">{settings.targetIsLoss ? 'Weight Loss' : 'Weight Gain'}</div>
-			</div>
-		</div>
+
+			{#if settingsSaved}
+				<div role="alert" class="alert alert-success">
+					<span>Settings saved.</span>
+				</div>
+			{/if}
+			{#if settingsError}
+				<div role="alert" class="alert alert-error">
+					<span>Failed to save settings.</span>
+				</div>
+			{/if}
+		</form>
 		{#snippet clickable()}
-			<button class="btn btn-soft btn-success grow">Update</button>
+			<button
+				class="btn btn-soft btn-success grow"
+				onclick={handleSettingsSave}
+				disabled={savingSettings}
+			>
+				{#if savingSettings}
+					Saving...
+				{:else}
+					Update
+				{/if}
+			</button>
 		{/snippet}
 	</Container>
 	<Container title="Data Handling">
