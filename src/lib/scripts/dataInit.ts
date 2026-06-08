@@ -7,7 +7,7 @@ import {
 	addWeight,
 	updateCalories,
 	updateWeight as updateWeightFb
-} from '$lib/middleware/firebase';
+} from '$lib/middleware/storage';
 import { findNewestWeight, findHighestWeight, findLowestWeight } from '$lib/scripts/helpers';
 import {
 	updateSettings,

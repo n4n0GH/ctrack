@@ -1,4 +1,4 @@
-import { getUserSettings, getUserWeight, getCalories } from '$lib/middleware/firebase';
+import { getUserSettings, getUserWeight, getCalories } from '$lib/middleware/storage';
 import { findNewestWeight, findLowestWeight, findHighestWeight } from '$lib/scripts/helpers';
 import { updateSettings, initUserWeight, initCalories } from '$lib/scripts/stateModifier.svelte';
 import { Update, Fetch, Init } from '$lib/scripts/dataInit';
@@ -21,11 +21,24 @@ const fetchData = async () => {
 	};
 };
 
+const defaultSettings = {
+	activityFactor: 1.2,
+	age: 30,
+	currentWeight: 0,
+	startingWeight: 0,
+	lowestWeight: 0,
+	height: 170,
+	highestWeight: 0,
+	gender: 'male' as const,
+	deficit: 500,
+	targetIsLoss: true
+};
+
 export const load = async () => {
 	await fetchData().then((data) => {
 		const fweights = data.weights;
 		const fcalories = data.calories;
-		const fsettings = data.settings;
+		const fsettings = data.settings ?? defaultSettings;
 		const factivity = data.activityHistory;
 
 		const currentWeight = findNewestWeight(fweights);

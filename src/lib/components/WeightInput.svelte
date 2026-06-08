@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getFbTime, addWeight } from '$lib/middleware/firebase';
+	import { getFbTime } from '$lib/middleware/storage';
 	import { timePadding, getIsoDate, getStampedDate } from '$lib/scripts/helpers';
 	import { settings } from '$lib/state/settings.svelte';
 	import { userWeights } from '$lib/state/weight.svelte';

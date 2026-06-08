@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getFbTime } from '$lib/middleware/firebase';
+	import { getFbTime } from '$lib/middleware/storage';
 	import { timePadding, getStampedDate } from '$lib/scripts/helpers';
 	import { Update } from '$lib/scripts/dataInit';
 	import type { WeightItem } from '$lib/data/types';

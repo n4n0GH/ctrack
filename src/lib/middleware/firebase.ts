@@ -19,6 +19,19 @@ import {
 
 import type { CalorieSelector, EnergyItem, WeightItem, ActivityHistoryItem } from '$lib/data/types';
 
+/**
+ * Returns the document count for a given collection in Firebase.
+ * Note: firestore/lite does not support count aggregation, so we use getDocs.
+ * This is called once per collection during sync to decide whether a full fetch is needed.
+ * @param collectionName the name of the Firebase collection
+ * @returns the number of documents in the collection
+ */
+export const getCollectionCount = async (collectionName: string): Promise<number> => {
+	const colRef = collection(db, collectionName);
+	const snapshot = await getDocs(colRef);
+	return snapshot.docs.length;
+};
+
 const firebaseConfig = {
 	apiKey: PUBLIC_API_KEY,
 	authDomain: PUBLIC_AUTH_DOMAIN,
