@@ -6,9 +6,16 @@
  * component code.
  */
 
+import { browser } from '$app/environment';
 import * as fb from '$lib/middleware/firebase';
 import * as idb from '$lib/middleware/idb';
-import type { CalorieSelector, EnergyItem, WeightItem } from '$lib/data/types';
+import type {
+	CalorieSelector,
+	EnergyItem,
+	WeightItem,
+	ActivityHistoryItem,
+	UserSettings
+} from '$lib/data/types';
 
 // ======================== Firebase availability ========================
 
@@ -31,6 +38,121 @@ export const checkFirebase = async (): Promise<boolean> => {
 };
 
 export const getFirebaseStatus = (): boolean => isFirebaseAvailable;
+
+// ======================== App bootstrap ========================
+
+/**
+ * Shape of the initial data set the app boots with.
+ */
+export interface InitialData {
+	settings: UserSettings | undefined;
+	weights: WeightItem[];
+	intake: EnergyItem[];
+	burned: EnergyItem[];
+	activity: ActivityHistoryItem[];
+}
+
+const EMPTY_INITIAL_DATA: InitialData = {
+	settings: undefined,
+	weights: [],
+	intake: [],
+	burned: [],
+	activity: []
+};
+
+/**
+ * Reads the full data set directly from IndexedDB. Every call is individually
+ * guarded so a single failing store can never prevent the others from loading.
+ */
+const readLocal = async (): Promise<InitialData> => {
+	const safe = async <T>(fn: () => Promise<T>, fallback: T): Promise<T> => {
+		try {
+			return await fn();
+		} catch (e) {
+			console.warn('Local read failed:', e);
+			return fallback;
+		}
+	};
+
+	return {
+		settings: await safe(() => idb.getUserSettings(), undefined),
+		weights: await safe(() => idb.getUserWeight(), []),
+		intake: await safe(() => idb.getCalories('calorieIntake'), []),
+		burned: await safe(() => idb.getCalories('calorieBurn'), []),
+		activity: await safe(() => idb.getActivityHistory(), [])
+	};
+};
+
+/**
+ * Best-effort read straight from Firebase. Used during SSR where IndexedDB is
+ * unavailable. Returns empty data (never throws) so a quota-exhausted backend
+ * still yields a renderable UI.
+ */
+const readRemote = async (): Promise<InitialData> => {
+	try {
+		const [settings, weights, intake, burned, activity] = await Promise.all([
+			fb.getUserSettings(),
+			fb.getUserWeight(),
+			fb.getCalories('calorieIntake'),
+			fb.getCalories('calorieBurn'),
+			fb.getActivityHistory()
+		]);
+		return {
+			settings: settings as UserSettings | undefined,
+			weights: weights as WeightItem[],
+			intake: intake as EnergyItem[],
+			burned: burned as EnergyItem[],
+			activity: activity as ActivityHistoryItem[]
+		};
+	} catch (e) {
+		console.warn('Remote read failed (Firebase unavailable):', e);
+		return EMPTY_INITIAL_DATA;
+	}
+};
+
+/**
+ * Loads the data set the app boots with, local-first and crash-proof.
+ *
+ * Order of operations:
+ *  1. Read everything from IndexedDB — this always succeeds and gives the UI
+ *     immediate data to render.
+ *  2. Check the Firebase connection. If it is exhausted/unreachable, the local
+ *     data is returned as-is and the app stays fully usable.
+ *  3. When Firebase is reachable, pull any *newer* content into IndexedDB and
+ *     re-read it, so the local mirror is updated without discarding offline
+ *     additions.
+ *
+ * This function never throws: a "resource-exhausted" Firebase error results in
+ * the locally cached data being used rather than the app failing to start.
+ */
+export const loadInitialData = async (): Promise<InitialData> => {
+	// On the server there is no IndexedDB, so fall back to a best-effort
+	// Firebase read (which itself swallows quota errors).
+	if (!browser) {
+		return readRemote();
+	}
+
+	// 1. Local first — guaranteed to produce a renderable UI.
+	const local = await readLocal();
+
+	// 2. Check the Firebase connection.
+	const online = await checkFirebase();
+	if (!online) {
+		return local;
+	}
+
+	// 3. Firebase is reachable: fold any newer remote content into IndexedDB,
+	//    then re-read so the UI reflects the refreshed local mirror.
+	try {
+		await idb.syncFromFirebase();
+	} catch (e) {
+		console.warn('Firebase sync failed; continuing with local data:', e);
+		isFirebaseAvailable = false;
+		return local;
+	}
+
+	return readLocal();
+};
 
 // ======================== Public getters ========================
 

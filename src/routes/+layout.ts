@@ -1,30 +1,10 @@
-import { getUserSettings, getUserWeight, getCalories } from '$lib/middleware/storage';
+import { loadInitialData } from '$lib/middleware/storage';
 import { findNewestWeight, findLowestWeight, findHighestWeight } from '$lib/scripts/helpers';
-import {
-	updateSettings,
-	initUserWeight,
-	initCalories,
-	markDataLoaded
-} from '$lib/scripts/stateModifier.svelte';
-import { Update, Fetch, Init } from '$lib/scripts/dataInit';
+import { markDataLoaded } from '$lib/scripts/stateModifier.svelte';
+import { Update, Init } from '$lib/scripts/dataInit';
 
 const init = new Init();
-const pull = new Fetch();
 const pushTo = new Update();
-
-const fetchData = async () => {
-	const dbSettings = await pull.settings();
-	const weights = await pull.weights();
-	const caloriesIn = await pull.calories('calorieIntake');
-	const caloriesOut = await pull.calories('calorieBurn');
-	const activityHistory = await pull.activities();
-	return {
-		settings: dbSettings,
-		weights: weights,
-		calories: { intake: caloriesIn, burned: caloriesOut },
-		activityHistory: activityHistory
-	};
-};
 
 const defaultSettings = {
 	activityFactor: 1.2,
@@ -40,11 +20,14 @@ const defaultSettings = {
 };
 
 export const load = async () => {
-	await fetchData().then((data) => {
+	try {
+		// loadInitialData is local-first and never throws: it reads IndexedDB,
+		// then folds in any newer Firebase content when the backend is reachable.
+		// If Firebase is exhausted/unreachable the locally cached data is used.
+		const data = await loadInitialData();
+
 		const fweights = data.weights;
-		const fcalories = data.calories;
 		const fsettings = data.settings ?? defaultSettings;
-		const factivity = data.activityHistory;
 
 		const currentWeight = findNewestWeight(fweights);
 		const athWeight = findHighestWeight(fweights);
@@ -62,18 +45,18 @@ export const load = async () => {
 			deficit: fsettings.deficit,
 			targetIsLoss: fsettings.targetIsLoss
 		};
-		const calorieData = {
-			intake: fcalories.intake,
-			burned: fcalories.burned
-		};
-		const activityData = {
-			history: factivity
-		};
 
 		pushTo.settings(newSettings);
-		init.calories(calorieData);
+		init.calories({ intake: data.intake, burned: data.burned });
 		init.weights(fweights);
-		init.activities(activityData);
+		init.activities({ history: data.activity });
+	} catch (e) {
+		// Last-resort guard: whatever goes wrong, the app must still boot with a
+		// usable UI rather than crashing on startup.
+		console.error('App data initialization failed; starting with default settings:', e);
+		pushTo.settings(defaultSettings);
+	} finally {
+		// Always signal that the boot sequence is complete so the UI renders.
 		markDataLoaded();
-	});
+	}
 };
