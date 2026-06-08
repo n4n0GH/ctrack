@@ -1,5 +1,14 @@
 /// <reference types="@sveltejs/kit" />
+/// <reference no-default-lib="true"/>
+/// <reference lib="esnext" />
+/// <reference lib="webworker" />
+
 import { build, files, version } from '$service-worker';
+
+// `self` in a service worker is the ServiceWorkerGlobalScope, not a Window. The
+// double cast tells the type-checker that, so skipWaiting/clients/FetchEvent etc.
+// resolve correctly (the build-time worker lib already provides them).
+const sw = /** @type {ServiceWorkerGlobalScope} */ (/** @type {unknown} */ (self));
 
 // A versioned cache so each deploy replaces the previous snapshot cleanly.
 const CACHE = `ctrack-cache-${version}`;
@@ -9,36 +18,36 @@ const CACHE = `ctrack-cache-${version}`;
 // which the static adapter serves for every route.
 const PRECACHE = [...build, ...files, '/'];
 
-self.addEventListener('install', (event) => {
+sw.addEventListener('install', (event) => {
 	event.waitUntil(
 		(async () => {
 			const cache = await caches.open(CACHE);
 			await cache.addAll(PRECACHE);
 			// Activate this worker immediately instead of waiting for old tabs to close.
-			await self.skipWaiting();
+			await sw.skipWaiting();
 		})()
 	);
 });
 
-self.addEventListener('activate', (event) => {
+sw.addEventListener('activate', (event) => {
 	event.waitUntil(
 		(async () => {
 			// Drop caches from previous versions.
 			for (const key of await caches.keys()) {
 				if (key !== CACHE) await caches.delete(key);
 			}
-			await self.clients.claim();
+			await sw.clients.claim();
 		})()
 	);
 });
 
-self.addEventListener('fetch', (event) => {
+sw.addEventListener('fetch', (event) => {
 	const { request } = event;
 	if (request.method !== 'GET') return;
 
 	const url = new URL(request.url);
 	// Only handle our own origin; let cross-origin (e.g. Firebase) hit the network.
-	if (url.origin !== self.location.origin) return;
+	if (url.origin !== sw.location.origin) return;
 
 	event.respondWith(
 		(async () => {

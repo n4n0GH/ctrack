@@ -150,13 +150,13 @@
 		top: 0;
 		left: 0;
 		width: 100%;
-		/* Clear the fixed bottom dock (≈72px) plus the iOS home-indicator inset so
-		   the end of every page is reachable and not hidden behind the navbar. */
-		padding-bottom: calc(5rem + env(safe-area-inset-bottom));
-	}
-
-	/* Keep the dock itself above the iOS home indicator. */
-	:global(.dock) {
-		padding-bottom: env(safe-area-inset-bottom);
+		/* Respect device safe areas (notch / status bar at the top, rounded corners
+		   in landscape) so content isn't drawn under them. */
+		padding-top: env(safe-area-inset-top);
+		padding-left: env(safe-area-inset-left);
+		padding-right: env(safe-area-inset-right);
+		/* Clear the fixed bottom dock (daisyUI dock-lg = 4.5rem + the home-indicator
+		   inset) so the end of every page stays reachable above the navbar. */
+		padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
 	}
 </style>
