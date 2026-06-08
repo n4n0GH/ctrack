@@ -9,8 +9,11 @@
 		fullSyncFromFirebase,
 		persistInMemoryToIndexedDB,
 		updateUserSettings,
-		flushOutbox
+		flushOutbox,
+		exportDatabase,
+		importDatabase
 	} from '$lib/middleware/storage';
+	import type { BackupFile } from '$lib/middleware/storage';
 	import { activityLevels, goalOptions } from '$lib/data/options';
 	import type { UserGoal, UserSettings } from '$lib/data/types';
 
@@ -54,6 +57,75 @@
 			retryError = true;
 		} finally {
 			retrying = false;
+		}
+	}
+
+	// === Backup / Restore ===
+	let exporting = $state(false);
+	let exportError = $state(false);
+	let restoring = $state(false);
+	let restoreError = $state(false);
+	let restoreResult = $state<Record<string, number> | null>(null);
+	let restoreFileInput = $state<HTMLInputElement | null>(null);
+
+	async function handleExport() {
+		exporting = true;
+		exportError = false;
+		try {
+			const backup = await exportDatabase();
+			const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `ctrack-backup-${new Date().toISOString().split('T')[0]}.json`;
+			document.body.appendChild(a);
+			a.click();
+			a.remove();
+			URL.revokeObjectURL(url);
+		} catch (e) {
+			console.error('Export failed:', e);
+			exportError = true;
+		} finally {
+			exporting = false;
+		}
+	}
+
+	async function handleRestoreFile(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		// Reset the input so selecting the same file again re-triggers change.
+		input.value = '';
+		if (!file) return;
+
+		restoreError = false;
+		restoreResult = null;
+
+		let backup: BackupFile;
+		try {
+			backup = JSON.parse(await file.text());
+		} catch {
+			restoreError = true;
+			return;
+		}
+		if (backup?.app !== 'ctrack' || typeof backup.stores !== 'object') {
+			restoreError = true;
+			return;
+		}
+		if (!confirm('Restore will overwrite all current local data with the backup. Continue?')) {
+			return;
+		}
+
+		restoring = true;
+		try {
+			const result = await importDatabase(backup);
+			restoreResult = result.imported;
+			// Reload so the app re-reads the restored data into in-memory state.
+			setTimeout(() => location.reload(), 900);
+		} catch (e) {
+			console.error('Restore failed:', e);
+			restoreError = true;
+		} finally {
+			restoring = false;
 		}
 	}
 
@@ -513,6 +585,49 @@
 				{:else}
 					Retry Failed Syncs
 				{/if}
+			</button>
+		{/snippet}
+	</Container>
+	<Container title="Backup & Restore">
+		<div class="flex w-full flex-col gap-2 px-1">
+			<p class="text-sm opacity-70">
+				Export your entire local database to a single file, or restore it from a previous export.
+			</p>
+			{#if exportError}
+				<div role="alert" class="alert alert-error mt-1">
+					<span>Export failed.</span>
+				</div>
+			{/if}
+			{#if restoreResult}
+				<div role="alert" class="alert alert-success mt-1">
+					<span
+						>Restored {Object.values(restoreResult).reduce((a, b) => a + b, 0)} records. Reloading…</span
+					>
+				</div>
+			{/if}
+			{#if restoreError}
+				<div role="alert" class="alert alert-error mt-1">
+					<span>Restore failed — the file is not a valid CTrack backup.</span>
+				</div>
+			{/if}
+		</div>
+		<input
+			type="file"
+			accept="application/json"
+			class="hidden"
+			bind:this={restoreFileInput}
+			onchange={handleRestoreFile}
+		/>
+		{#snippet clickable()}
+			<button class="btn btn-soft btn-success grow" onclick={handleExport} disabled={exporting}>
+				{exporting ? 'Exporting…' : 'Export Backup'}
+			</button>
+			<button
+				class="btn btn-soft btn-warning grow"
+				onclick={() => restoreFileInput?.click()}
+				disabled={restoring}
+			>
+				{restoring ? 'Restoring…' : 'Restore Backup'}
 			</button>
 		{/snippet}
 	</Container>

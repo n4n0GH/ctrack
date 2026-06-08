@@ -481,5 +481,9 @@ export {
 	saveUserSettings,
 	syncFromFirebase,
 	fullSyncFromFirebase,
-	persistInMemoryToIndexedDB
+	persistInMemoryToIndexedDB,
+	exportDatabase,
+	importDatabase
 } from '$lib/middleware/idb';
+
+export type { BackupFile } from '$lib/middleware/idb';

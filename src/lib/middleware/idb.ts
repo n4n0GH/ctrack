@@ -370,6 +370,80 @@ export const removeOutbox = async (id: number): Promise<void> => {
 	});
 };
 
+// ==================== BACKUP / RESTORE ====================
+
+/**
+ * A full snapshot of the IndexedDB contents, suitable for serialising to a
+ * single backup file. `stores` maps each object-store name to all of its
+ * records (keys are kept inline via each store's keyPath).
+ */
+export interface BackupFile {
+	app: 'ctrack';
+	version: number;
+	exportedAt: string;
+	stores: Record<string, unknown[]>;
+}
+
+/**
+ * Exports every object store into a single, self-describing snapshot. Iterating
+ * the live store list keeps the backup complete and future-proof as stores are
+ * added.
+ */
+export const exportDatabase = async (): Promise<BackupFile> => {
+	const base: BackupFile = {
+		app: 'ctrack',
+		version: DB_VERSION,
+		exportedAt: new Date().toISOString(),
+		stores: {}
+	};
+	if (!browser) return base;
+
+	const db = await openDb();
+	for (const name of Array.from(db.objectStoreNames)) {
+		base.stores[name] = await new Promise<unknown[]>((resolve, reject) => {
+			const tx = db.transaction(name, 'readonly');
+			const request = tx.objectStore(name).getAll();
+			request.onsuccess = () => resolve(request.result);
+			request.onerror = () => reject(request.error);
+		});
+	}
+	return base;
+};
+
+/**
+ * Restores the database from a backup snapshot. Each store present in both the
+ * backup and the live database is cleared and repopulated from the file; stores
+ * the current schema doesn't have are skipped. Records are written with put()
+ * so their original keys are preserved.
+ *
+ * @returns the number of records restored per store
+ */
+export const importDatabase = async (
+	backup: BackupFile
+): Promise<{ imported: Record<string, number> }> => {
+	const imported: Record<string, number> = {};
+	if (!browser) return { imported };
+
+	const db = await openDb();
+	const existing = new Set(Array.from(db.objectStoreNames));
+
+	for (const [name, records] of Object.entries(backup.stores)) {
+		if (!existing.has(name) || !Array.isArray(records)) continue;
+		await new Promise<void>((resolve, reject) => {
+			const tx = db.transaction(name, 'readwrite');
+			const store = tx.objectStore(name);
+			store.clear();
+			for (const record of records as Record<string, unknown>[]) {
+				store.put(record);
+			}
+			tx.oncomplete = () => resolve();
+			tx.onerror = () => reject(tx.error);
+		});
+		imported[name] = records.length;
+	}
+	return { imported };
+};
+
 /**
  * Checks if IndexedDB has any data (for sync decisions)
  */
