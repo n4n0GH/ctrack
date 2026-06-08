@@ -4,10 +4,18 @@
  */
 
 import { browser } from '$app/environment';
-import type { EnergyItem, WeightItem, ActivityHistoryItem, UserSettings } from '$lib/data/types';
+import type {
+	EnergyItem,
+	WeightItem,
+	ActivityHistoryItem,
+	UserSettings,
+	OutboxOperation,
+	OutboxEntry
+} from '$lib/data/types';
 
 const DB_NAME = 'ctrack-db';
-const DB_VERSION = 1;
+// v2 introduces the outbox store for deferred Firebase writes.
+const DB_VERSION = 2;
 
 // Collection names matching Firebase
 const STORES = {
@@ -17,6 +25,10 @@ const STORES = {
 	burn: 'calorieBurn',
 	activity: 'activityHistory'
 } as const;
+
+// Holds Firebase writes that failed and must be retried later. Kept out of
+// STORES so the sync/clear helpers never wipe pending writes.
+const OUTBOX_STORE = 'outbox';
 
 type StoreName = (typeof STORES)[keyof typeof STORES];
 
@@ -34,6 +46,10 @@ const openDb = (): Promise<IDBDatabase> => {
 				if (!db.objectStoreNames.contains(storeName)) {
 					db.createObjectStore(storeName, { keyPath: 'id', autoIncrement: true });
 				}
+			}
+			// Outbox for deferred Firebase writes.
+			if (!db.objectStoreNames.contains(OUTBOX_STORE)) {
+				db.createObjectStore(OUTBOX_STORE, { keyPath: 'id', autoIncrement: true });
 			}
 		};
 
@@ -288,6 +304,51 @@ export const clearAllStores = async (): Promise<void> => {
 		tx.objectStore(storeName).clear();
 	}
 	return new Promise<void>((resolve, reject) => {
+		tx.oncomplete = () => resolve();
+		tx.onerror = () => reject(tx.error);
+	});
+};
+
+// ==================== OUTBOX (deferred Firebase writes) ====================
+
+/**
+ * Appends a failed Firebase write to the outbox so it can be retried later.
+ */
+export const enqueueOutbox = async (op: OutboxOperation): Promise<void> => {
+	if (!browser) return;
+	const db = await openDb();
+	const tx = db.transaction(OUTBOX_STORE, 'readwrite');
+	// The autoIncrement keyPath assigns the `id`, so the op is stored as-is.
+	tx.objectStore(OUTBOX_STORE).add(op as unknown as Record<string, unknown>);
+	return new Promise((resolve, reject) => {
+		tx.oncomplete = () => resolve();
+		tx.onerror = () => reject(tx.error);
+	});
+};
+
+/**
+ * Returns all queued Firebase writes awaiting retry, oldest first.
+ */
+export const getOutbox = async (): Promise<OutboxEntry[]> => {
+	if (!browser) return [];
+	const db = await openDb();
+	const tx = db.transaction(OUTBOX_STORE, 'readonly');
+	const request = tx.objectStore(OUTBOX_STORE).getAll();
+	return new Promise((resolve, reject) => {
+		request.onsuccess = () => resolve(request.result as OutboxEntry[]);
+		request.onerror = () => reject(request.error);
+	});
+};
+
+/**
+ * Removes a queued write once it has been successfully flushed to Firebase.
+ */
+export const removeOutbox = async (id: number): Promise<void> => {
+	if (!browser) return;
+	const db = await openDb();
+	const tx = db.transaction(OUTBOX_STORE, 'readwrite');
+	tx.objectStore(OUTBOX_STORE).delete(id);
+	return new Promise((resolve, reject) => {
 		tx.oncomplete = () => resolve();
 		tx.onerror = () => reject(tx.error);
 	});

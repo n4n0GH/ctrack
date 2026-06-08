@@ -48,6 +48,19 @@ export type UserSettings = {
 
 export type CalorieSelector = 'calorieBurn' | 'calorieIntake';
 
+/**
+ * A Firebase write that failed (quota exceeded / unreachable) and has been
+ * deferred to the IndexedDB outbox for retry on a later page load.
+ */
+export type OutboxOperation =
+	| { type: 'addCalories'; path: CalorieSelector; item: EnergyItem }
+	| { type: 'updateCalories'; path: CalorieSelector; docId: string; item: EnergyItem }
+	| { type: 'addWeight'; item: WeightItem }
+	| { type: 'updateWeight'; docId: string; item: WeightItem };
+
+/** An outbox operation as stored, with its auto-incremented key. */
+export type OutboxEntry = OutboxOperation & { id: number };
+
 export type ModalSelector =
 	| 'calorieAddModal'
 	| 'calorieBurnModal'

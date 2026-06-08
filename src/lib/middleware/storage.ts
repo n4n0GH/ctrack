@@ -14,7 +14,8 @@ import type {
 	EnergyItem,
 	WeightItem,
 	ActivityHistoryItem,
-	UserSettings
+	UserSettings,
+	OutboxOperation
 } from '$lib/data/types';
 
 // ======================== Firebase availability ========================
@@ -206,26 +207,58 @@ export const getCalories = async (path: CalorieSelector) => {
 
 // ======================== Public writers ========================
 
-export const addCalories = async (path: CalorieSelector, calorieItem: EnergyItem) => {
+/**
+ * Queues a deferred Firebase write and flips the availability flag so the rest
+ * of the session goes straight to the local-first path instead of re-hitting an
+ * exhausted/unreachable backend.
+ */
+const enqueueAndMarkDown = async (op: OutboxOperation): Promise<void> => {
+	isFirebaseAvailable = false;
+	try {
+		await idb.enqueueOutbox(op);
+	} catch (e) {
+		console.warn('Failed to queue Firebase write for retry:', e);
+	}
+};
+
+/**
+ * Attempts a Firebase write. On any failure — a thrown error, an unreachable
+ * backend, or a rejected write (e.g. quota exceeded, which the Firebase layer
+ * surfaces as `success: false` rather than throwing) — the operation is queued
+ * in the IndexedDB outbox to be retried on a later page load.
+ *
+ * Never throws; returns true only when Firebase accepted the write.
+ */
+const tryFirebaseWrite = async (
+	write: () => Promise<{ success: boolean }>,
+	op: OutboxOperation
+): Promise<boolean> => {
 	if (!isFirebaseAvailable) {
-		return idb.addCalories(path, calorieItem);
+		await enqueueAndMarkDown(op);
+		return false;
 	}
 	try {
-		const result = await fb.addCalories(path, calorieItem);
-		// Mirror successful writes to IndexedDB so data persists locally
-		if (result.success) {
-			try {
-				await idb.addCalories(path, calorieItem);
-			} catch {
-				// Silently ignore IndexedDB mirror failures — Firebase
-				// already succeeded, so this is just a backup optimization.
-			}
-		}
-		return result;
+		const result = await write();
+		if (result.success) return true;
+		await enqueueAndMarkDown(op);
+		return false;
 	} catch {
-		isFirebaseAvailable = false;
-		return idb.addCalories(path, calorieItem);
+		await enqueueAndMarkDown(op);
+		return false;
 	}
+};
+
+export const addCalories = async (path: CalorieSelector, calorieItem: EnergyItem) => {
+	// Local-first: persist to IndexedDB so the write is never lost, then push to
+	// Firebase (queuing for retry if it is down). The local result is returned so
+	// the UI updates regardless of Firebase availability.
+	const local = await idb.addCalories(path, calorieItem);
+	await tryFirebaseWrite(() => fb.addCalories(path, calorieItem), {
+		type: 'addCalories',
+		path,
+		item: calorieItem
+	});
+	return local;
 };
 
 export const updateCalories = async (
@@ -233,43 +266,23 @@ export const updateCalories = async (
 	docId: string,
 	updateItem: EnergyItem
 ) => {
-	if (!isFirebaseAvailable) {
-		return idb.updateCalories(path, docId, updateItem);
-	}
-	try {
-		const result = await fb.updateCalories(path, docId, updateItem);
-		if (result.success) {
-			try {
-				await idb.updateCalories(path, docId, updateItem);
-			} catch {
-				// Silently ignore
-			}
-		}
-		return result;
-	} catch {
-		isFirebaseAvailable = false;
-		return idb.updateCalories(path, docId, updateItem);
-	}
+	const local = await idb.updateCalories(path, docId, updateItem);
+	await tryFirebaseWrite(() => fb.updateCalories(path, docId, updateItem), {
+		type: 'updateCalories',
+		path,
+		docId,
+		item: updateItem
+	});
+	return local;
 };
 
 export const addWeight = async (newWeight: WeightItem) => {
-	if (!isFirebaseAvailable) {
-		return idb.addWeight(newWeight);
-	}
-	try {
-		const result = await fb.addWeight(newWeight);
-		if (result.success) {
-			try {
-				await idb.addWeight(newWeight);
-			} catch {
-				// Silently ignore
-			}
-		}
-		return result;
-	} catch {
-		isFirebaseAvailable = false;
-		return idb.addWeight(newWeight);
-	}
+	const local = await idb.addWeight(newWeight);
+	await tryFirebaseWrite(() => fb.addWeight(newWeight), {
+		type: 'addWeight',
+		item: newWeight
+	});
+	return local;
 };
 
 /**
@@ -303,23 +316,74 @@ export const updateUserSettings = async (
 };
 
 export const updateWeight = async (docId: string, updateItem: WeightItem) => {
-	if (!isFirebaseAvailable) {
-		return idb.updateWeight(docId, updateItem);
-	}
+	const local = await idb.updateWeight(docId, updateItem);
+	await tryFirebaseWrite(() => fb.updateWeight(docId, updateItem), {
+		type: 'updateWeight',
+		docId,
+		item: updateItem
+	});
+	return local;
+};
+
+/**
+ * Retries all queued Firebase writes (the outbox). Intended to run in the
+ * background on each page load: if Firebase is reachable again, every deferred
+ * calorie/weight write is replayed in order and removed once accepted. If a
+ * write still fails (e.g. quota not yet reset) the flush stops and the remaining
+ * entries are left for the next page load.
+ *
+ * Never throws.
+ */
+export const flushOutbox = async (): Promise<{ flushed: number; remaining: number }> => {
+	if (!browser) return { flushed: 0, remaining: 0 };
+
+	let entries;
 	try {
-		const result = await fb.updateWeight(docId, updateItem);
-		if (result.success) {
-			try {
-				await idb.updateWeight(docId, updateItem);
-			} catch {
-				// Silently ignore
-			}
-		}
-		return result;
-	} catch {
-		isFirebaseAvailable = false;
-		return idb.updateWeight(docId, updateItem);
+		entries = await idb.getOutbox();
+	} catch (e) {
+		console.warn('Failed to read outbox:', e);
+		return { flushed: 0, remaining: 0 };
 	}
+	if (entries.length === 0) return { flushed: 0, remaining: 0 };
+
+	// Only attempt the queued writes once Firebase is confirmed reachable.
+	const online = await checkFirebase();
+	if (!online) return { flushed: 0, remaining: entries.length };
+
+	let flushed = 0;
+	for (const entry of entries) {
+		try {
+			let ok = false;
+			switch (entry.type) {
+				case 'addCalories':
+					ok = (await fb.addCalories(entry.path, entry.item)).success;
+					break;
+				case 'updateCalories':
+					ok = (await fb.updateCalories(entry.path, entry.docId, entry.item)).success;
+					break;
+				case 'addWeight':
+					ok = (await fb.addWeight(entry.item)).success;
+					break;
+				case 'updateWeight':
+					ok = (await fb.updateWeight(entry.docId, entry.item)).success;
+					break;
+			}
+
+			if (ok) {
+				await idb.removeOutbox(entry.id);
+				flushed++;
+			} else {
+				// Backend still rejecting writes — stop and retry on the next load.
+				isFirebaseAvailable = false;
+				break;
+			}
+		} catch {
+			isFirebaseAvailable = false;
+			break;
+		}
+	}
+
+	return { flushed, remaining: entries.length - flushed };
 };
 
 // ======================== Sync utilities ========================

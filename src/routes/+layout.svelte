@@ -1,10 +1,19 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { fly } from 'svelte/transition';
+	import { flushOutbox } from '$lib/middleware/storage';
 
 	import '../app.css';
 	let { children } = $props();
+
+	// On each fresh page load, retry any calorie/weight writes that previously
+	// failed to reach Firebase (quota exceeded / offline). Runs in the background
+	// so it never blocks rendering, and never throws.
+	onMount(() => {
+		flushOutbox().catch(() => {});
+	});
 
 	const routes = ['/', '/calories', '/weight', '/settings'];
 	let direction = $state(1);
