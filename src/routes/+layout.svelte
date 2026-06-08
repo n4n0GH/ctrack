@@ -150,5 +150,13 @@
 		top: 0;
 		left: 0;
 		width: 100%;
+		/* Clear the fixed bottom dock (≈72px) plus the iOS home-indicator inset so
+		   the end of every page is reachable and not hidden behind the navbar. */
+		padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+	}
+
+	/* Keep the dock itself above the iOS home indicator. */
+	:global(.dock) {
+		padding-bottom: env(safe-area-inset-bottom);
 	}
 </style>
