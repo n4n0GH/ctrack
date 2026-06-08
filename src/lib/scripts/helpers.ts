@@ -29,30 +29,37 @@ export const getAgeFactor = (userGender: 'male' | 'female') => {
 	return userGender == 'male' ? 5 : 4.7;
 };
 
+// Fallback for an empty weight history so the reducers below never throw
+// "Reduce of empty array" — callers read `.weight`, which must stay defined.
+const EMPTY_WEIGHT: WeightItem = { weight: 0, date: { seconds: 0, nanoseconds: 0 } };
+
 /**
  * finds the latest weight item in an array
  * @param weights an array of weights to compare
- * @returns the newest weight item
+ * @returns the newest weight item (a zero placeholder when the list is empty)
  */
 export const findNewestWeight = (weights: WeightItem[] | DocumentData[]) => {
+	if (weights.length === 0) return EMPTY_WEIGHT;
 	return weights.reduce((a, b) => (a.date.seconds > b.date.seconds ? a : b));
 };
 
 /**
  * finds the lowest weight item in an array
  * @param weights an array of weights to compare
- * @returns the item with the lowest weight
+ * @returns the item with the lowest weight (a zero placeholder when empty)
  */
 export const findLowestWeight = (weights: WeightItem[] | DocumentData[]) => {
+	if (weights.length === 0) return EMPTY_WEIGHT;
 	return weights.reduce((a, b) => (a.weight < b.weight ? a : b));
 };
 
 /**
  * finds the highest weight item in an array
  * @param weights an array of weights to compare
- * @returns the item with the highest weight
+ * @returns the item with the highest weight (a zero placeholder when empty)
  */
 export const findHighestWeight = (weights: WeightItem[] | DocumentData[]) => {
+	if (weights.length === 0) return EMPTY_WEIGHT;
 	return weights.reduce((a, b) => (a.weight > b.weight ? a : b));
 };
 

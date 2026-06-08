@@ -5,6 +5,7 @@ import {
 	doc,
 	getDocs,
 	addDoc,
+	setDoc,
 	updateDoc,
 	Timestamp
 } from 'firebase/firestore/lite';
@@ -178,14 +179,20 @@ export const updateCalories = async (
  */
 export const addCalories = async (path: CalorieSelector, calorieItem: EnergyItem) => {
 	let updateSuccess = false;
-	await addDoc(collection(db, path), calorieItem)
-		.then(() => {
-			updateSuccess = true;
-		})
-		.catch((e) => {
-			console.error(e);
-			updateSuccess = false;
-		});
+	// Use the client-generated id as the document id (via setDoc) so the same
+	// add can be replayed from the outbox idempotently — no duplicate documents.
+	const { id, ...payload } = calorieItem;
+	try {
+		if (id) {
+			await setDoc(doc(db, path, id), payload);
+		} else {
+			await addDoc(collection(db, path), payload);
+		}
+		updateSuccess = true;
+	} catch (e) {
+		console.error(e);
+		updateSuccess = false;
+	}
 	return {
 		success: updateSuccess,
 		data: calorieItem
@@ -227,13 +234,19 @@ export const updateWeight = async (docId: string, updateItem: WeightItem) => {
  */
 export const addWeight = async (newWeight: WeightItem) => {
 	let updateSuccess = false;
-	await addDoc(collection(db, 'weightHistory'), newWeight)
-		.then(() => {
-			updateSuccess = true;
-		})
-		.catch((e) => {
-			console.error(e);
-			updateSuccess = false;
-		});
+	// Use the client-generated id as the document id (via setDoc) so the same
+	// add can be replayed from the outbox idempotently — no duplicate documents.
+	const { id, ...payload } = newWeight;
+	try {
+		if (id) {
+			await setDoc(doc(db, 'weightHistory', id), payload);
+		} else {
+			await addDoc(collection(db, 'weightHistory'), payload);
+		}
+		updateSuccess = true;
+	} catch (e) {
+		console.error(e);
+		updateSuccess = false;
+	}
 	return { success: updateSuccess, data: newWeight };
 };

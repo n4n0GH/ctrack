@@ -4,6 +4,14 @@ import { markDataLoaded } from '$lib/scripts/stateModifier.svelte';
 import { Update, Init } from '$lib/scripts/dataInit';
 import type { UserGoal, UserSettings } from '$lib/data/types';
 
+// This is a client-side, local-first app: all data lives in IndexedDB (browser
+// only) and the Firebase client SDK. Server-rendering the layout would run
+// `load` where IndexedDB does not exist, so the local cache could never feed the
+// UI and an exhausted/unreachable Firebase would render (and previously crash)
+// with empty data. Disabling SSR makes `load` run in the browser, so the
+// IndexedDB-first path actually surfaces.
+export const ssr = false;
+
 const init = new Init();
 const pushTo = new Update();
 

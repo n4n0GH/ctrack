@@ -7,10 +7,14 @@
 
 	let weightValue = $derived(settings.currentWeight);
 	let submitError = $state('');
-	let latestWeight = userWeights.sort((a, b) => b.date.seconds - a.date.seconds)[0];
-	let visceralValue = $derived(latestWeight.visceral);
-	let bodyfatValue = $derived(latestWeight.fat);
-	let muscleValue = $derived(latestWeight.muscle);
+	// slice() so we don't mutate the shared reactive array; the list may be empty
+	// (no weight history yet, or Firebase unreachable), so guard every read.
+	let latestWeight = $derived(
+		userWeights.slice().sort((a, b) => b.date.seconds - a.date.seconds)[0]
+	);
+	let visceralValue = $derived(latestWeight?.visceral ?? 0);
+	let bodyfatValue = $derived(latestWeight?.fat ?? 0);
+	let muscleValue = $derived(latestWeight?.muscle ?? 0);
 	let date = $state(getIsoDate().split('T')[0]);
 	let time = $state(
 		timePadding(new Date().getHours()) + ':' + timePadding(new Date().getMinutes())

@@ -8,7 +8,8 @@
 	import {
 		fullSyncFromFirebase,
 		persistInMemoryToIndexedDB,
-		updateUserSettings
+		updateUserSettings,
+		flushOutbox
 	} from '$lib/middleware/storage';
 	import { activityLevels, goalOptions } from '$lib/data/options';
 	import type { UserGoal, UserSettings } from '$lib/data/types';
@@ -37,6 +38,24 @@
 	let savingSettings = $state(false);
 	let settingsSaved = $state(false);
 	let settingsError = $state(false);
+
+	let retrying = $state(false);
+	let retryResult = $state<{ flushed: number; remaining: number } | null>(null);
+	let retryError = $state(false);
+
+	async function handleRetry() {
+		retrying = true;
+		retryResult = null;
+		retryError = false;
+
+		try {
+			retryResult = await flushOutbox();
+		} catch {
+			retryError = true;
+		} finally {
+			retrying = false;
+		}
+	}
 
 	async function handleSettingsSave() {
 		savingSettings = true;
@@ -363,6 +382,52 @@
 				<span>Persist to IndexedDB failed.</span>
 			</div>
 		{/if}
+		{#if retryResult}
+			<div
+				role="alert"
+				class="alert mx-auto mt-2 {retryResult.remaining > 0 ? 'alert-warning' : 'alert-success'}"
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="h-6 w-6 shrink-0 stroke-current"
+					fill="none"
+					viewBox="0 0 24 24"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+					/>
+				</svg>
+				{#if retryResult.flushed === 0 && retryResult.remaining === 0}
+					<span>Nothing to retry — all writes are already synced.</span>
+				{:else}
+					<span
+						>Retried {retryResult.flushed} pending write{retryResult.flushed === 1 ? '' : 's'}.
+						{retryResult.remaining} still pending.</span
+					>
+				{/if}
+			</div>
+		{/if}
+		{#if retryError}
+			<div role="alert" class="alert alert-error mx-auto mt-2">
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="h-6 w-6 shrink-0 stroke-current"
+					fill="none"
+					viewBox="0 0 24 24"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+					/>
+				</svg>
+				<span>Retry failed. Firebase may still be unavailable.</span>
+			</div>
+		{/if}
 		{#snippet clickable()}
 			<button class="btn btn-soft btn-success grow" onclick={handleSync} disabled={syncing}>
 				{#if syncing}
@@ -420,6 +485,33 @@
 					Persisting...
 				{:else}
 					Persist to IndexedDB
+				{/if}
+			</button>
+			<button class="btn btn-soft btn-warning grow" onclick={handleRetry} disabled={retrying}>
+				{#if retrying}
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-5 w-5 animate-spin"
+						fill="none"
+						viewBox="0 0 24 24"
+					>
+						<circle
+							class="opacity-25"
+							cx="12"
+							cy="12"
+							r="10"
+							stroke="currentColor"
+							stroke-width="4"
+						/>
+						<path
+							class="opacity-75"
+							fill="currentColor"
+							d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+						/>
+					</svg>
+					Retrying...
+				{:else}
+					Retry Failed Syncs
 				{/if}
 			</button>
 		{/snippet}

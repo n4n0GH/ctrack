@@ -208,6 +208,16 @@ export const getCalories = async (path: CalorieSelector) => {
 // ======================== Public writers ========================
 
 /**
+ * Generates a client-side unique id used as the shared key for both IndexedDB
+ * and the Firebase document. This lets an offline-created item keep one stable
+ * id across stores, so later edits and outbox retries always target it.
+ */
+const newId = (): string =>
+	typeof crypto !== 'undefined' && 'randomUUID' in crypto
+		? crypto.randomUUID()
+		: `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+/**
  * Queues a deferred Firebase write and flips the availability flag so the rest
  * of the session goes straight to the local-first path instead of re-hitting an
  * exhausted/unreachable backend.
@@ -249,14 +259,17 @@ const tryFirebaseWrite = async (
 };
 
 export const addCalories = async (path: CalorieSelector, calorieItem: EnergyItem) => {
+	// Stamp a shared id up front so IndexedDB, Firebase, and any queued retry all
+	// reference the same record.
+	const item: EnergyItem = { ...calorieItem, id: calorieItem.id ?? newId() };
 	// Local-first: persist to IndexedDB so the write is never lost, then push to
 	// Firebase (queuing for retry if it is down). The local result is returned so
 	// the UI updates regardless of Firebase availability.
-	const local = await idb.addCalories(path, calorieItem);
-	await tryFirebaseWrite(() => fb.addCalories(path, calorieItem), {
+	const local = await idb.addCalories(path, item);
+	await tryFirebaseWrite(() => fb.addCalories(path, item), {
 		type: 'addCalories',
 		path,
-		item: calorieItem
+		item
 	});
 	return local;
 };
@@ -277,10 +290,11 @@ export const updateCalories = async (
 };
 
 export const addWeight = async (newWeight: WeightItem) => {
-	const local = await idb.addWeight(newWeight);
-	await tryFirebaseWrite(() => fb.addWeight(newWeight), {
+	const item: WeightItem = { ...newWeight, id: newWeight.id ?? newId() };
+	const local = await idb.addWeight(item);
+	await tryFirebaseWrite(() => fb.addWeight(item), {
 		type: 'addWeight',
-		item: newWeight
+		item
 	});
 	return local;
 };

@@ -14,8 +14,9 @@ import type {
 } from '$lib/data/types';
 
 const DB_NAME = 'ctrack-db';
-// v2 introduces the outbox store for deferred Firebase writes.
-const DB_VERSION = 2;
+// v2: outbox store for deferred Firebase writes.
+// v3: data stores re-keyed onto Firebase document ids (shared id space).
+const DB_VERSION = 3;
 
 // Collection names matching Firebase
 const STORES = {
@@ -41,6 +42,20 @@ const openDb = (): Promise<IDBDatabase> => {
 
 		request.onupgradeneeded = (event) => {
 			const db = (event.target as IDBOpenDBRequest).result;
+			const oldVersion = event.oldVersion;
+
+			// v3 migration: earlier versions keyed records on auto-incremented
+			// numbers, disjoint from Firebase document ids. Drop the data stores so
+			// they re-sync from Firebase under the shared id space. The outbox is
+			// deliberately left untouched so queued writes survive the upgrade.
+			if (oldVersion > 0 && oldVersion < 3) {
+				for (const storeName of Object.values(STORES)) {
+					if (db.objectStoreNames.contains(storeName)) {
+						db.deleteObjectStore(storeName);
+					}
+				}
+			}
+
 			// Create object stores if they don't exist
 			for (const storeName of Object.values(STORES)) {
 				if (!db.objectStoreNames.contains(storeName)) {
@@ -112,8 +127,9 @@ const updateRecord = async <T extends Record<string, unknown>>(
 	const tx = db.transaction(storeName, 'readwrite');
 	const store = tx.objectStore(storeName);
 
-	// Merge existing record with updates, preserving the id
-	const getRequest = store.get(Number(id));
+	// Merge existing record with updates, preserving the id. Ids are shared with
+	// Firebase (string document ids), so the key is used as-is.
+	const getRequest = store.get(id);
 
 	return new Promise((resolve, reject) => {
 		getRequest.onsuccess = () => {
@@ -422,14 +438,11 @@ export const syncFromFirebase = async (): Promise<{
 		const tx = db.transaction(storeName, 'readwrite');
 		const store = tx.objectStore(storeName);
 		for (const record of records) {
-			// Drop any embedded `id` so the autoIncrement keyPath assigns a fresh,
-			// unique key. In-memory/Firebase records can carry duplicate or absent
-			// `id` values (e.g. numeric ids injected back into Firestore by a prior
-			// local→cloud sync). A duplicate key throws ConstraintError, which aborts
-			// the whole transaction and silently writes nothing for that collection.
-			const rest = { ...record };
-			delete rest.id;
-			store.add(rest);
+			// Preserve the `id` so IndexedDB and Firebase share one key space
+			// (records without an id — e.g. settings/activity — fall back to the
+			// store's autoIncrement generator). put() is idempotent, so a re-sync
+			// can't throw a ConstraintError on an already-present key.
+			store.put(record);
 		}
 		return new Promise((resolve, reject) => {
 			tx.oncomplete = () => resolve(records.length);
@@ -527,14 +540,11 @@ export const fullSyncFromFirebase = async (): Promise<{
 		const tx = db.transaction(storeName, 'readwrite');
 		const store = tx.objectStore(storeName);
 		for (const record of records) {
-			// Drop any embedded `id` so the autoIncrement keyPath assigns a fresh,
-			// unique key. In-memory/Firebase records can carry duplicate or absent
-			// `id` values (e.g. numeric ids injected back into Firestore by a prior
-			// local→cloud sync). A duplicate key throws ConstraintError, which aborts
-			// the whole transaction and silently writes nothing for that collection.
-			const rest = { ...record };
-			delete rest.id;
-			store.add(rest);
+			// Preserve the `id` so IndexedDB and Firebase share one key space
+			// (records without an id — e.g. settings/activity — fall back to the
+			// store's autoIncrement generator). put() is idempotent, so a re-sync
+			// can't throw a ConstraintError on an already-present key.
+			store.put(record);
 		}
 		return new Promise((resolve, reject) => {
 			tx.oncomplete = () => resolve(records.length);
@@ -630,14 +640,11 @@ export const persistInMemoryToIndexedDB = async (data: {
 		const tx = db.transaction(storeName, 'readwrite');
 		const store = tx.objectStore(storeName);
 		for (const record of records) {
-			// Drop any embedded `id` so the autoIncrement keyPath assigns a fresh,
-			// unique key. In-memory/Firebase records can carry duplicate or absent
-			// `id` values (e.g. numeric ids injected back into Firestore by a prior
-			// local→cloud sync). A duplicate key throws ConstraintError, which aborts
-			// the whole transaction and silently writes nothing for that collection.
-			const rest = { ...record };
-			delete rest.id;
-			store.add(rest);
+			// Preserve the `id` so IndexedDB and Firebase share one key space
+			// (records without an id — e.g. settings/activity — fall back to the
+			// store's autoIncrement generator). put() is idempotent, so a re-sync
+			// can't throw a ConstraintError on an already-present key.
+			store.put(record);
 		}
 		return new Promise((resolve, reject) => {
 			tx.oncomplete = () => resolve(records.length);
