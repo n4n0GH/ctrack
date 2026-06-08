@@ -17,8 +17,7 @@ let isFirebaseAvailable = true;
 /**
  * Attempts to ping Firebase. Sets the availability flag used by the
  * fallback wrapper. Returns true when Firebase is reachable and false
- * when it has
- thrown (e.g. quota exceeded).
+ * when it has thrown (e.g. quota exceeded).
  */
 export const checkFirebase = async (): Promise<boolean> => {
 	try {
@@ -252,5 +251,6 @@ export {
 	hasLocalData,
 	saveUserSettings,
 	syncFromFirebase,
-	fullSyncFromFirebase
+	fullSyncFromFirebase,
+	persistInMemoryToIndexedDB
 } from '$lib/middleware/idb';

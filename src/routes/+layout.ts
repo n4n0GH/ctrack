@@ -1,6 +1,11 @@
 import { getUserSettings, getUserWeight, getCalories } from '$lib/middleware/storage';
 import { findNewestWeight, findLowestWeight, findHighestWeight } from '$lib/scripts/helpers';
-import { updateSettings, initUserWeight, initCalories } from '$lib/scripts/stateModifier.svelte';
+import {
+	updateSettings,
+	initUserWeight,
+	initCalories,
+	markDataLoaded
+} from '$lib/scripts/stateModifier.svelte';
 import { Update, Fetch, Init } from '$lib/scripts/dataInit';
 
 const init = new Init();
@@ -69,5 +74,6 @@ export const load = async () => {
 		init.calories(calorieData);
 		init.weights(fweights);
 		init.activities(activityData);
+		markDataLoaded();
 	});
 };

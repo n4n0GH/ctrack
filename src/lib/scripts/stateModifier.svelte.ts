@@ -5,6 +5,17 @@ import { activity } from '$lib/state/activityHistory.svelte';
 import type { UserSettings, WeightItem, EnergyItem, ActivityHistoryItem } from '$lib/data/types';
 import type { DocumentData } from 'firebase/firestore';
 
+/* == Data loaded tracking == */
+
+let dataLoadedState = $state(false);
+
+export const markDataLoaded = () => {
+	dataLoadedState = true;
+};
+
+export const dataLoaded = () => {
+	return dataLoadedState;
+};
 /* == App Settings == */
 
 export const updateSettings = (newSettings: UserSettings) => {

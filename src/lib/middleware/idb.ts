@@ -361,7 +361,14 @@ export const syncFromFirebase = async (): Promise<{
 		const tx = db.transaction(storeName, 'readwrite');
 		const store = tx.objectStore(storeName);
 		for (const record of records) {
-			store.add(record);
+			// Drop any embedded `id` so the autoIncrement keyPath assigns a fresh,
+			// unique key. In-memory/Firebase records can carry duplicate or absent
+			// `id` values (e.g. numeric ids injected back into Firestore by a prior
+			// local→cloud sync). A duplicate key throws ConstraintError, which aborts
+			// the whole transaction and silently writes nothing for that collection.
+			const rest = { ...record };
+			delete rest.id;
+			store.add(rest);
 		}
 		return new Promise((resolve, reject) => {
 			tx.oncomplete = () => resolve(records.length);
@@ -459,7 +466,14 @@ export const fullSyncFromFirebase = async (): Promise<{
 		const tx = db.transaction(storeName, 'readwrite');
 		const store = tx.objectStore(storeName);
 		for (const record of records) {
-			store.add(record);
+			// Drop any embedded `id` so the autoIncrement keyPath assigns a fresh,
+			// unique key. In-memory/Firebase records can carry duplicate or absent
+			// `id` values (e.g. numeric ids injected back into Firestore by a prior
+			// local→cloud sync). A duplicate key throws ConstraintError, which aborts
+			// the whole transaction and silently writes nothing for that collection.
+			const rest = { ...record };
+			delete rest.id;
+			store.add(rest);
 		}
 		return new Promise((resolve, reject) => {
 			tx.oncomplete = () => resolve(records.length);
@@ -477,11 +491,11 @@ export const fullSyncFromFirebase = async (): Promise<{
 			const fbData = await fbFetch();
 			results[fieldKey] = await bulkAdd(storeName, fbData);
 		} catch (err) {
+			// Record the failure but keep going — one collection failing must not
+			// abort the remaining collections. The caller inspects failedCollections
+			// to report partial success, so we resolve rather than reject here.
 			console.warn(`Failed to sync ${fieldKey} from Firebase:`, err);
 			results.failedCollections.push(fieldKey);
-			throw new Error(
-				`Sync failed for ${fieldKey}: ${err instanceof Error ? err.message : 'Unknown error'}`
-			);
 		}
 	};
 
@@ -506,6 +520,114 @@ export const fullSyncFromFirebase = async (): Promise<{
 
 	// Sync activity history
 	await syncCollection(STORES.activity, async () => await fb.getActivityHistory(), 'activity');
+
+	return results;
+};
+
+/**
+ * Persists the currently loaded in-memory data to IndexedDB.
+ * Unlike fullSyncFromFirebase, this does NOT fetch from Firebase.
+ * It takes the data that is already in memory (Svelte stores) and
+ * writes it to IndexedDB, overwriting all existing entries.
+ *
+ * @returns Object indicating how many records were persisted per collection
+ */
+export const persistInMemoryToIndexedDB = async (data: {
+	settings: UserSettings;
+	weights: Record<string, unknown>[];
+	intake: Record<string, unknown>[];
+	burned: Record<string, unknown>[];
+	activity: Record<string, unknown>[];
+}): Promise<{
+	settings: number;
+	weights: number;
+	intake: number;
+	burn: number;
+	activity: number;
+}> => {
+	if (!browser) {
+		return { settings: 0, weights: 0, intake: 0, burn: 0, activity: 0 };
+	}
+
+	// Wipe all local data first
+	await clearAllStores();
+
+	const results = {
+		settings: 0,
+		weights: 0,
+		intake: 0,
+		burn: 0,
+		activity: 0
+	};
+
+	// Helper to bulk-add records to a store
+	const bulkAdd = async (
+		storeName: StoreName,
+		records: Record<string, unknown>[]
+	): Promise<number> => {
+		const db = await openDb();
+		const tx = db.transaction(storeName, 'readwrite');
+		const store = tx.objectStore(storeName);
+		for (const record of records) {
+			// Drop any embedded `id` so the autoIncrement keyPath assigns a fresh,
+			// unique key. In-memory/Firebase records can carry duplicate or absent
+			// `id` values (e.g. numeric ids injected back into Firestore by a prior
+			// local→cloud sync). A duplicate key throws ConstraintError, which aborts
+			// the whole transaction and silently writes nothing for that collection.
+			const rest = { ...record };
+			delete rest.id;
+			store.add(rest);
+		}
+		return new Promise((resolve, reject) => {
+			tx.oncomplete = () => resolve(records.length);
+			tx.onerror = () => reject(tx.error);
+		});
+	};
+
+	// Persist settings
+	if (data.settings) {
+		try {
+			results.settings = await bulkAdd(STORES.settings, [data.settings]);
+		} catch (err) {
+			console.warn('Failed to persist settings:', err);
+		}
+	}
+
+	// Persist weights
+	if (data.weights.length > 0) {
+		try {
+			results.weights = await bulkAdd(STORES.weight, data.weights);
+		} catch (err) {
+			console.warn('Failed to persist weights:', err);
+		}
+	}
+
+	// Persist intake
+	if (data.intake.length > 0) {
+		try {
+			results.intake = await bulkAdd(STORES.intake, data.intake);
+		} catch (err) {
+			console.warn('Failed to persist intake:', err);
+		}
+	}
+
+	// Persist burned calories
+	if (data.burned.length > 0) {
+		try {
+			results.burn = await bulkAdd(STORES.burn, data.burned);
+		} catch (err) {
+			console.warn('Failed to persist burned calories:', err);
+		}
+	}
+
+	// Persist activity history
+	if (data.activity.length > 0) {
+		try {
+			results.activity = await bulkAdd(STORES.activity, data.activity);
+		} catch (err) {
+			console.warn('Failed to persist activity:', err);
+		}
+	}
 
 	return results;
 };
