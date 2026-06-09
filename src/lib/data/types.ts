@@ -49,6 +49,20 @@ export type UserSettings = {
 export type CalorieSelector = 'calorieBurn' | 'calorieIntake';
 
 /**
+ * The user-supplied Firebase web app configuration. These are public project
+ * identifiers (not secrets), entered on the settings page and stored locally in
+ * IndexedDB so each device can point at the user's own Firebase project.
+ */
+export type FirebaseConfig = {
+	apiKey: string;
+	authDomain: string;
+	projectId: string;
+	storageBucket: string;
+	messagingSenderId: string;
+	appId: string;
+};
+
+/**
  * A Firebase write that failed (quota exceeded / unreachable) and has been
  * deferred to the IndexedDB outbox for retry on a later page load.
  */

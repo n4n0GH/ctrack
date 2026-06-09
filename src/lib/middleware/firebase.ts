@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, type FirebaseApp } from 'firebase/app';
 import {
 	getFirestore,
 	type Firestore,
@@ -10,10 +10,7 @@ import {
 	updateDoc,
 	Timestamp
 } from 'firebase/firestore/lite';
-// Read via the dynamic public env so a build with no Firebase credentials does
-// not fail (a missing `$env/static/public` member is a hard build error). When
-// PUBLIC_API_KEY is absent the app runs entirely on IndexedDB.
-import { env } from '$env/dynamic/public';
+import { getFirebaseConfig } from '$lib/middleware/idb';
 
 import type {
 	CalorieSelector,
@@ -23,12 +20,47 @@ import type {
 	UserSettings
 } from '$lib/data/types';
 
+// The Firebase client is initialised lazily from the user-supplied config stored
+// in IndexedDB (entered on the settings page), so each device points at its own
+// project. Until a valid config is present the app runs entirely on IndexedDB.
+let app: FirebaseApp | null = null;
+let db: Firestore | null = null;
+let configured = false;
+
 /**
- * Whether Firebase is configured for this build. Derived from the presence of a
- * public API key; when false the data layer never initialises or calls Firestore
- * and operates as an IndexedDB-only store.
+ * Whether a Firebase config has been loaded and the client initialised. This is
+ * a synchronous snapshot for guards/UI; it only becomes true after
+ * `initFirebase()` has run successfully (which happens during app bootstrap).
  */
-export const firebaseEnabled = Boolean(env.PUBLIC_API_KEY);
+export const isFirebaseConfigured = (): boolean => configured;
+
+/**
+ * Loads the user-supplied Firebase config from IndexedDB and initialises the
+ * client on first use. Idempotent — later calls reuse the existing instance.
+ * Returns the Firestore handle, or null when no config has been entered yet.
+ */
+export const initFirebase = async (): Promise<Firestore | null> => {
+	if (db) return db;
+	const config = await getFirebaseConfig();
+	if (!config?.apiKey) {
+		configured = false;
+		return null;
+	}
+	app = initializeApp(config);
+	db = getFirestore(app);
+	configured = true;
+	return db;
+};
+
+/**
+ * Returns the live Firestore handle, throwing if Firebase has not been
+ * initialised. Every helper below is only reached after the storage layer has
+ * confirmed availability via `initFirebase()`, so this never throws in practice.
+ */
+const requireDb = (): Firestore => {
+	if (!db) throw new Error('Firebase has not been initialised');
+	return db;
+};
 
 /**
  * Returns the document count for a given collection in Firebase.
@@ -38,24 +70,10 @@ export const firebaseEnabled = Boolean(env.PUBLIC_API_KEY);
  * @returns the number of documents in the collection
  */
 export const getCollectionCount = async (collectionName: string): Promise<number> => {
-	const colRef = collection(db, collectionName);
+	const colRef = collection(requireDb(), collectionName);
 	const snapshot = await getDocs(colRef);
 	return snapshot.docs.length;
 };
-
-const firebaseConfig = {
-	apiKey: env.PUBLIC_API_KEY,
-	authDomain: env.PUBLIC_AUTH_DOMAIN,
-	projectId: env.PUBLIC_PROJECT_ID,
-	storageBucket: env.PUBLIC_STORAGE_BUCKET,
-	messagingSenderId: env.PUBLIC_MESSAGE_SENDER_ID,
-	appId: env.PUBLIC_APP_ID
-};
-
-// Only initialise Firebase when it is configured. The cast keeps the helpers
-// below simply typed — they are only ever reached when `firebaseEnabled` is
-// true, since the storage layer guards every Firestore call.
-const db = (firebaseEnabled ? getFirestore(initializeApp(firebaseConfig)) : null) as Firestore;
 
 /**
  * Exposes Firebase timestamping util to the application
@@ -71,7 +89,7 @@ export const getFbTime = (stamp: number) => {
  * @returns the user settings object
  */
 export const getUserSettings = async () => {
-	const settingsCol = collection(db, 'userSettings');
+	const settingsCol = collection(requireDb(), 'userSettings');
 	const settings = await getDocs(settingsCol);
 	return settings.docs.map((doc) => doc.data())[0];
 };
@@ -95,10 +113,10 @@ export const updateUserSettings = async (settings: UserSettings) => {
 		goal: settings.goal
 	};
 	try {
-		const settingsCol = collection(db, 'userSettings');
+		const settingsCol = collection(requireDb(), 'userSettings');
 		const snapshot = await getDocs(settingsCol);
 		if (snapshot.docs.length > 0) {
-			const docRef = doc(db, 'userSettings', snapshot.docs[0].id);
+			const docRef = doc(requireDb(), 'userSettings', snapshot.docs[0].id);
 			await updateDoc(docRef, payload);
 		} else {
 			await addDoc(settingsCol, payload);
@@ -116,7 +134,7 @@ export const updateUserSettings = async (settings: UserSettings) => {
  * @returns the list of weight history objects
  */
 export const getUserWeight = async () => {
-	const weightCol = collection(db, 'weightHistory');
+	const weightCol = collection(requireDb(), 'weightHistory');
 	const weights = await getDocs(weightCol);
 	return weights.docs.map((doc) => {
 		return {
@@ -131,7 +149,7 @@ export const getUserWeight = async () => {
  * @returns the list of activity history objects
  */
 export const getActivityHistory = async () => {
-	const activityCol = collection(db, 'activityHistory');
+	const activityCol = collection(requireDb(), 'activityHistory');
 	const activities = await getDocs(activityCol);
 	return activities.docs.map((doc) => doc.data());
 };
@@ -142,7 +160,7 @@ export const getActivityHistory = async () => {
  * @returns the list of calorie history objects
  */
 export const getCalories = async (path: CalorieSelector) => {
-	const caloriesCol = collection(db, path);
+	const caloriesCol = collection(requireDb(), path);
 	const calories = await getDocs(caloriesCol);
 	return calories.docs.map((doc) => {
 		return {
@@ -163,7 +181,7 @@ export const updateCalories = async (
 	updateItem: EnergyItem
 ) => {
 	let updateSuccess = false;
-	const docRef = doc(db, path, docId);
+	const docRef = doc(requireDb(), path, docId);
 	await updateDoc(docRef, { name: updateItem.name, energyValue: updateItem.energyValue })
 		.then(() => {
 			updateSuccess = true;
@@ -190,9 +208,9 @@ export const addCalories = async (path: CalorieSelector, calorieItem: EnergyItem
 	const { id, ...payload } = calorieItem;
 	try {
 		if (id) {
-			await setDoc(doc(db, path, id), payload);
+			await setDoc(doc(requireDb(), path, id), payload);
 		} else {
-			await addDoc(collection(db, path), payload);
+			await addDoc(collection(requireDb(), path), payload);
 		}
 		updateSuccess = true;
 	} catch (e) {
@@ -212,7 +230,7 @@ export const addCalories = async (path: CalorieSelector, calorieItem: EnergyItem
  */
 export const updateWeight = async (docId: string, updateItem: WeightItem) => {
 	let updateSuccess = false;
-	const docRef = doc(db, 'weightHistory', docId);
+	const docRef = doc(requireDb(), 'weightHistory', docId);
 	await updateDoc(docRef, {
 		weight: updateItem.weight,
 		date: Timestamp.fromMillis(updateItem.date.seconds * 1000),
@@ -245,9 +263,9 @@ export const addWeight = async (newWeight: WeightItem) => {
 	const { id, ...payload } = newWeight;
 	try {
 		if (id) {
-			await setDoc(doc(db, 'weightHistory', id), payload);
+			await setDoc(doc(requireDb(), 'weightHistory', id), payload);
 		} else {
-			await addDoc(collection(db, 'weightHistory'), payload);
+			await addDoc(collection(requireDb(), 'weightHistory'), payload);
 		}
 		updateSuccess = true;
 	} catch (e) {

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { settings } from '$lib/state/settings.svelte';
 	import { userWeights } from '$lib/state/weight.svelte';
 	import { calories } from '$lib/state/calories.svelte';
@@ -12,11 +13,84 @@
 		flushOutbox,
 		exportDatabase,
 		importDatabase,
-		firebaseEnabled
+		isFirebaseConfigured,
+		getFirebaseConfig,
+		saveFirebaseConfig,
+		clearFirebaseConfig
 	} from '$lib/middleware/storage';
 	import type { BackupFile } from '$lib/middleware/storage';
 	import { activityLevels, goalOptions } from '$lib/data/options';
-	import type { UserGoal, UserSettings } from '$lib/data/types';
+	import type { UserGoal, UserSettings, FirebaseConfig } from '$lib/data/types';
+
+	// Whether a Firebase config is active on this device. Read once on mount; the
+	// save/clear handlers reload the page so a fresh config initialises at boot.
+	let firebaseEnabled = $state(isFirebaseConfigured());
+
+	// === Firebase config (cloud sync) ===
+	let fbForm = $state<FirebaseConfig>({
+		apiKey: '',
+		authDomain: '',
+		projectId: '',
+		storageBucket: '',
+		messagingSenderId: '',
+		appId: ''
+	});
+	let savingConfig = $state(false);
+	let configSaved = $state(false);
+	let configError = $state(false);
+	let clearingConfig = $state(false);
+
+	onMount(async () => {
+		const existing = await getFirebaseConfig();
+		if (existing) fbForm = existing;
+	});
+
+	async function handleSaveConfig() {
+		savingConfig = true;
+		configSaved = false;
+		configError = false;
+
+		const config = $state.snapshot(fbForm);
+		// The apiKey and projectId are the minimum needed to reach a Firestore
+		// project; the rest are filled from the same console config block.
+		if (!config.apiKey.trim() || !config.projectId.trim()) {
+			configError = true;
+			savingConfig = false;
+			return;
+		}
+
+		try {
+			await saveFirebaseConfig(config);
+			configSaved = true;
+			// Reload so the new config is initialised at bootstrap and the local
+			// data loader can fold in any existing cloud content.
+			setTimeout(() => location.reload(), 900);
+		} catch (e) {
+			console.error('Failed to save Firebase config:', e);
+			configError = true;
+			savingConfig = false;
+		}
+	}
+
+	async function handleClearConfig() {
+		if (
+			!confirm(
+				'Disconnect Firebase? Your local data stays on this device; cloud sync stops until you re-enter the config.'
+			)
+		) {
+			return;
+		}
+		clearingConfig = true;
+		configError = false;
+		try {
+			await clearFirebaseConfig();
+			setTimeout(() => location.reload(), 600);
+		} catch (e) {
+			console.error('Failed to clear Firebase config:', e);
+			configError = true;
+			clearingConfig = false;
+		}
+	}
 
 	// Local, editable copy of the user-configurable settings. Derived fields
 	// (current/highest/lowest weight) are intentionally omitted — they are
@@ -353,6 +427,127 @@
 					Update
 				{/if}
 			</button>
+		{/snippet}
+	</Container>
+	<Container title="Cloud Sync (Firebase)">
+		<div class="flex w-full flex-col gap-4 px-4 pb-2">
+			<p class="text-sm opacity-70">
+				Optional. Paste your own Firebase web-app config to sync this device to your Firestore
+				project. These are public project identifiers, stored only in this browser's local database.
+				Leave blank to keep all data on-device.
+			</p>
+
+			{#if firebaseEnabled}
+				<div role="alert" class="alert alert-success">
+					<span>Connected — cloud sync is active on this device.</span>
+				</div>
+			{:else}
+				<div role="alert" class="alert alert-info">
+					<span>Not connected — data is stored locally on this device only.</span>
+				</div>
+			{/if}
+
+			<label class="floating-label">
+				<span>API Key</span>
+				<input
+					type="text"
+					autocomplete="off"
+					autocapitalize="none"
+					spellcheck="false"
+					class="input input-bordered w-full"
+					placeholder="API Key"
+					bind:value={fbForm.apiKey}
+				/>
+			</label>
+			<label class="floating-label">
+				<span>Auth Domain</span>
+				<input
+					type="text"
+					autocomplete="off"
+					autocapitalize="none"
+					spellcheck="false"
+					class="input input-bordered w-full"
+					placeholder="project.firebaseapp.com"
+					bind:value={fbForm.authDomain}
+				/>
+			</label>
+			<label class="floating-label">
+				<span>Project ID</span>
+				<input
+					type="text"
+					autocomplete="off"
+					autocapitalize="none"
+					spellcheck="false"
+					class="input input-bordered w-full"
+					placeholder="Project ID"
+					bind:value={fbForm.projectId}
+				/>
+			</label>
+			<label class="floating-label">
+				<span>Storage Bucket</span>
+				<input
+					type="text"
+					autocomplete="off"
+					autocapitalize="none"
+					spellcheck="false"
+					class="input input-bordered w-full"
+					placeholder="project.firebasestorage.app"
+					bind:value={fbForm.storageBucket}
+				/>
+			</label>
+			<label class="floating-label">
+				<span>Messaging Sender ID</span>
+				<input
+					type="text"
+					autocomplete="off"
+					autocapitalize="none"
+					spellcheck="false"
+					class="input input-bordered w-full"
+					placeholder="Messaging Sender ID"
+					bind:value={fbForm.messagingSenderId}
+				/>
+			</label>
+			<label class="floating-label">
+				<span>App ID</span>
+				<input
+					type="text"
+					autocomplete="off"
+					autocapitalize="none"
+					spellcheck="false"
+					class="input input-bordered w-full"
+					placeholder="App ID"
+					bind:value={fbForm.appId}
+				/>
+			</label>
+
+			{#if configSaved}
+				<div role="alert" class="alert alert-success">
+					<span>Config saved. Reloading…</span>
+				</div>
+			{/if}
+			{#if configError}
+				<div role="alert" class="alert alert-error">
+					<span>Failed to save — an API Key and Project ID are required.</span>
+				</div>
+			{/if}
+		</div>
+		{#snippet clickable()}
+			<button
+				class="btn btn-soft btn-success grow"
+				onclick={handleSaveConfig}
+				disabled={savingConfig || clearingConfig}
+			>
+				{savingConfig ? 'Saving…' : firebaseEnabled ? 'Update Config' : 'Connect'}
+			</button>
+			{#if firebaseEnabled}
+				<button
+					class="btn btn-soft btn-error grow"
+					onclick={handleClearConfig}
+					disabled={savingConfig || clearingConfig}
+				>
+					{clearingConfig ? 'Disconnecting…' : 'Disconnect'}
+				</button>
+			{/if}
 		{/snippet}
 	</Container>
 	<Container title="Data Handling">

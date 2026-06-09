@@ -10,13 +10,15 @@ import type {
 	ActivityHistoryItem,
 	UserSettings,
 	OutboxOperation,
-	OutboxEntry
+	OutboxEntry,
+	FirebaseConfig
 } from '$lib/data/types';
 
 const DB_NAME = 'ctrack-db';
 // v2: outbox store for deferred Firebase writes.
 // v3: data stores re-keyed onto Firebase document ids (shared id space).
-const DB_VERSION = 3;
+// v4: firebaseConfig store holding the user-supplied Firebase identifiers.
+const DB_VERSION = 4;
 
 // Collection names matching Firebase
 const STORES = {
@@ -30,6 +32,12 @@ const STORES = {
 // Holds Firebase writes that failed and must be retried later. Kept out of
 // STORES so the sync/clear helpers never wipe pending writes.
 const OUTBOX_STORE = 'outbox';
+
+// Holds the single user-supplied Firebase config record (keyed under CONFIG_KEY).
+// Kept out of STORES so a data sync/clear never drops the device's connection
+// settings, and excluded from backups since it is device-specific.
+const CONFIG_STORE = 'firebaseConfig';
+const CONFIG_KEY = 'config';
 
 type StoreName = (typeof STORES)[keyof typeof STORES];
 
@@ -65,6 +73,11 @@ const openDb = (): Promise<IDBDatabase> => {
 			// Outbox for deferred Firebase writes.
 			if (!db.objectStoreNames.contains(OUTBOX_STORE)) {
 				db.createObjectStore(OUTBOX_STORE, { keyPath: 'id', autoIncrement: true });
+			}
+			// Single-record store for the user-supplied Firebase config. An inline
+			// `id` keyPath keeps put() key-less and consistent with the other stores.
+			if (!db.objectStoreNames.contains(CONFIG_STORE)) {
+				db.createObjectStore(CONFIG_STORE, { keyPath: 'id' });
 			}
 		};
 
@@ -370,6 +383,60 @@ export const removeOutbox = async (id: number): Promise<void> => {
 	});
 };
 
+// ==================== FIREBASE CONFIG ====================
+
+/**
+ * Reads the user-supplied Firebase config, or null when none has been entered.
+ * The stored record carries an `id` discriminator which is stripped before
+ * returning so the result is a clean FirebaseConfig.
+ */
+export const getFirebaseConfig = async (): Promise<FirebaseConfig | null> => {
+	if (!browser) return null;
+	const db = await openDb();
+	const tx = db.transaction(CONFIG_STORE, 'readonly');
+	const request = tx.objectStore(CONFIG_STORE).get(CONFIG_KEY);
+	return new Promise((resolve, reject) => {
+		request.onsuccess = () => {
+			const result = request.result as (FirebaseConfig & { id: string }) | undefined;
+			if (!result) {
+				resolve(null);
+				return;
+			}
+			const { id: _id, ...config } = result;
+			resolve(config);
+		};
+		request.onerror = () => reject(request.error);
+	});
+};
+
+/**
+ * Persists the user-supplied Firebase config (overwriting any existing record).
+ */
+export const saveFirebaseConfig = async (config: FirebaseConfig): Promise<void> => {
+	if (!browser) return;
+	const db = await openDb();
+	const tx = db.transaction(CONFIG_STORE, 'readwrite');
+	tx.objectStore(CONFIG_STORE).put({ id: CONFIG_KEY, ...config });
+	return new Promise((resolve, reject) => {
+		tx.oncomplete = () => resolve();
+		tx.onerror = () => reject(tx.error);
+	});
+};
+
+/**
+ * Removes the stored Firebase config, returning the app to local-only mode.
+ */
+export const clearFirebaseConfig = async (): Promise<void> => {
+	if (!browser) return;
+	const db = await openDb();
+	const tx = db.transaction(CONFIG_STORE, 'readwrite');
+	tx.objectStore(CONFIG_STORE).delete(CONFIG_KEY);
+	return new Promise((resolve, reject) => {
+		tx.oncomplete = () => resolve();
+		tx.onerror = () => reject(tx.error);
+	});
+};
+
 // ==================== BACKUP / RESTORE ====================
 
 /**
@@ -400,6 +467,9 @@ export const exportDatabase = async (): Promise<BackupFile> => {
 
 	const db = await openDb();
 	for (const name of Array.from(db.objectStoreNames)) {
+		// The Firebase config is device-specific connection state, not user data,
+		// so it is deliberately left out of portable backups.
+		if (name === CONFIG_STORE) continue;
 		base.stores[name] = await new Promise<unknown[]>((resolve, reject) => {
 			const tx = db.transaction(name, 'readonly');
 			const request = tx.objectStore(name).getAll();
@@ -492,8 +562,8 @@ export const syncFromFirebase = async (): Promise<{
 		synced: false
 	};
 
-	// Nothing to pull when Firebase isn't configured.
-	if (!fb.firebaseEnabled) return results;
+	// Nothing to pull when Firebase isn't configured on this device.
+	if (!(await fb.initFirebase())) return results;
 
 	// Helper to clear a store entirely
 	const clearStore = async (storeName: StoreName): Promise<void> => {
@@ -598,7 +668,7 @@ export const fullSyncFromFirebase = async (): Promise<{
 
 	// Guard *before* wiping anything: with Firebase unconfigured there is no
 	// source to repopulate from, so clearing would just destroy local data.
-	if (!fb.firebaseEnabled) {
+	if (!(await fb.initFirebase())) {
 		return { settings: 0, weights: 0, intake: 0, burn: 0, activity: 0, failedCollections: [] };
 	}
 
