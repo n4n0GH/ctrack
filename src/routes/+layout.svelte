@@ -145,6 +145,14 @@
 		min-height: calc(100vh - 180px);
 	}
 
+	/* The daisyUI dock ships with z-index: 1 — the same as daisyUI's
+	   floating-label text spans — so those labels could paint over the fixed
+	   bottom navbar while scrolling. Lift the dock above page content. The
+	   doubled class keeps specificity above the base `.dock` rule. */
+	:global(.dock.dock-lg) {
+		z-index: 50;
+	}
+
 	.transition-content {
 		position: absolute;
 		top: 0;
