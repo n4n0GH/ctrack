@@ -20,6 +20,7 @@
 		"@sveltejs/vite-plugin-svelte": "^5.0.0",
 		"@tailwindcss/forms": "^0.5.9",
 		"@tailwindcss/vite": "^4.1.11",
+		"@types/qrcode": "^1.5.6",
 		"prettier": "^3.4.2",
 		"prettier-plugin-svelte": "^3.3.3",
 		"prettier-plugin-tailwindcss": "^0.6.11",
@@ -33,6 +34,8 @@
 	"dependencies": {
 		"@carbon/charts-svelte": "^1.22.18",
 		"daisyui": "^5.0.43",
-		"firebase": "^11.10.0"
+		"firebase": "^11.10.0",
+		"jsqr": "^1.4.0",
+		"qrcode": "^1.5.4"
 	}
 }

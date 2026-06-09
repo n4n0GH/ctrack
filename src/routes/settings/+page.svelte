@@ -1,5 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { version } from '$app/environment';
+	import { forceUpdate } from '$lib/scripts/pwa';
+	import { encodeConfig, generateQrDataUrl } from '$lib/scripts/qr';
+	import QrScanner from '$lib/components/QrScanner.svelte';
 	import { settings } from '$lib/state/settings.svelte';
 	import { userWeights } from '$lib/state/weight.svelte';
 	import { calories } from '$lib/state/calories.svelte';
@@ -72,6 +76,44 @@
 		}
 	}
 
+	// === Air-gapped credential transfer (QR) ===
+	let qrDataUrl = $state('');
+	let qrError = $state(false);
+	let scanOpen = $state(false);
+	let scanError = $state('');
+
+	// The current form holds enough to share once an API key + project ID exist.
+	let canShareConfig = $derived(Boolean(fbForm.apiKey.trim() && fbForm.projectId.trim()));
+
+	async function handleShowQr() {
+		qrError = false;
+		qrDataUrl = '';
+		try {
+			qrDataUrl = await generateQrDataUrl(encodeConfig($state.snapshot(fbForm)));
+			(document.getElementById('qrShareModal') as HTMLDialogElement)?.showModal();
+		} catch (e) {
+			console.error('Failed to generate QR:', e);
+			qrError = true;
+			(document.getElementById('qrShareModal') as HTMLDialogElement)?.showModal();
+		}
+	}
+
+	function openScanner() {
+		scanError = '';
+		scanOpen = true;
+		(document.getElementById('qrScanModal') as HTMLDialogElement)?.showModal();
+	}
+
+	function handleScanned(config: FirebaseConfig) {
+		// Populate the form from the scanned credentials; the user reviews and
+		// presses Connect to persist + reload (consistent with manual entry).
+		fbForm = config;
+		scanOpen = false;
+		scanError = '';
+		(document.getElementById('qrScanModal') as HTMLDialogElement)?.close();
+		configSaved = false;
+	}
+
 	async function handleClearConfig() {
 		if (
 			!confirm(
@@ -89,6 +131,30 @@
 			console.error('Failed to clear Firebase config:', e);
 			configError = true;
 			clearingConfig = false;
+		}
+	}
+
+	// === App update (PWA) ===
+	let updating = $state(false);
+	let updateError = $state(false);
+
+	async function handleForceUpdate() {
+		if (
+			!confirm(
+				'Force update to the latest version? Your local data is kept; the app will reload.'
+			)
+		) {
+			return;
+		}
+		updating = true;
+		updateError = false;
+		try {
+			await forceUpdate();
+			// forceUpdate triggers a reload; this line is only reached if it didn't.
+		} catch (e) {
+			console.error('Force update failed:', e);
+			updateError = true;
+			updating = false;
 		}
 	}
 
@@ -520,6 +586,25 @@
 				/>
 			</label>
 
+			<div class="divider my-0 text-xs opacity-60">Air-gapped transfer</div>
+			<p class="text-sm opacity-70">
+				Move credentials between devices without a network: show a QR on the configured device and
+				scan it with the camera on the other.
+			</p>
+			<div class="flex gap-2">
+				<button
+					type="button"
+					class="btn btn-soft btn-info grow"
+					onclick={handleShowQr}
+					disabled={!canShareConfig}
+				>
+					Show QR
+				</button>
+				<button type="button" class="btn btn-soft btn-info grow" onclick={openScanner}>
+					Scan QR
+				</button>
+			</div>
+
 			{#if configSaved}
 				<div role="alert" class="alert alert-success">
 					<span>Config saved. Reloading…</span>
@@ -550,6 +635,49 @@
 			{/if}
 		{/snippet}
 	</Container>
+
+	<dialog id="qrShareModal" class="modal modal-bottom sm:modal-middle">
+		<div class="modal-box flex flex-col items-center gap-3">
+			<h3 class="text-lg font-semibold">Scan on the other device</h3>
+			{#if qrError}
+				<div role="alert" class="alert alert-error">
+					<span>Failed to generate the QR code.</span>
+				</div>
+			{:else if qrDataUrl}
+				<img src={qrDataUrl} alt="Firebase config QR code" class="bg-white p-2" width="320" height="320" />
+				<p class="text-center text-sm opacity-70">
+					Open Settings → Cloud Sync → Scan QR on the other device and point it here.
+				</p>
+			{/if}
+			<form method="dialog" class="w-full">
+				<button class="btn btn-soft w-full">Done</button>
+			</form>
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button>close</button>
+		</form>
+	</dialog>
+
+	<dialog id="qrScanModal" class="modal modal-bottom sm:modal-middle" onclose={() => (scanOpen = false)}>
+		<div class="modal-box flex flex-col items-center gap-3">
+			<h3 class="text-lg font-semibold">Scan config QR</h3>
+			{#if scanOpen}
+				<QrScanner onScan={handleScanned} onError={(m) => (scanError = m)} />
+			{/if}
+			{#if scanError}
+				<div role="alert" class="alert alert-error">
+					<span>{scanError}</span>
+				</div>
+			{/if}
+			<form method="dialog" class="w-full">
+				<button class="btn btn-soft w-full">Cancel</button>
+			</form>
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button>close</button>
+		</form>
+	</dialog>
+
 	<Container title="Data Handling">
 		{#if firebaseEnabled}
 			<div role="alert" class="alert alert-warning mx-auto">
@@ -834,6 +962,42 @@
 				disabled={restoring}
 			>
 				{restoring ? 'Restoring…' : 'Restore Backup'}
+			</button>
+		{/snippet}
+	</Container>
+	<Container title="App Updates">
+		<div class="flex w-full flex-col gap-2 px-1">
+			<p class="text-sm opacity-70">
+				Installed to your homescreen, the app caches itself to run offline and may keep serving an
+				old version. Force update fetches the latest version from the web. Your local data is kept.
+			</p>
+			<p class="text-xs opacity-50">Current version: <span class="font-mono">{version}</span></p>
+			{#if updateError}
+				<div role="alert" class="alert alert-error mt-1">
+					<span>Update failed. Check your connection and try again.</span>
+				</div>
+			{/if}
+		</div>
+		{#snippet clickable()}
+			<button class="btn btn-soft btn-warning grow" onclick={handleForceUpdate} disabled={updating}>
+				{#if updating}
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-5 w-5 animate-spin"
+						fill="none"
+						viewBox="0 0 24 24"
+					>
+						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+						<path
+							class="opacity-75"
+							fill="currentColor"
+							d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+						/>
+					</svg>
+					Updating…
+				{:else}
+					Force Update
+				{/if}
 			</button>
 		{/snippet}
 	</Container>
