@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import Container from '$lib/components/Container.svelte';
 	import WeightEdit from '$lib/components/WeightEdit.svelte';
 	import { LineChart, ScaleTypes } from '@carbon/charts-svelte';
@@ -13,6 +13,19 @@
 	// Lazy loading config
 	let visibleCount = $state(28);
 	const batchSize = 14;
+
+	// === Chart shrink-on-scroll (mobile) ===
+	// On small screens the chart eats a lot of vertical space, so we halve its
+	// height once the user scrolls past the top. A sentinel at the top of the
+	// page drives an IntersectionObserver: visible => full height, gone => shrunk.
+	let isMobile = $state(false);
+	let chartShrunk = $state(false);
+	let topSentinel: HTMLElement | null = $state(null);
+	let scrollObserver: IntersectionObserver | null = null;
+	let mobileQuery: MediaQueryList | null = null;
+	let onMobileChange: ((e: MediaQueryListEvent) => void) | null = null;
+
+	let chartHeight = $derived(isMobile && chartShrunk ? '160px' : '320px');
 
 	const loadMore = () => {
 		visibleCount += batchSize;
@@ -67,9 +80,31 @@
 		if (sentinelElement) {
 			observer.observe(sentinelElement);
 		}
+
+		// Track viewport size so the chart only shrinks on mobile (< md breakpoint).
+		mobileQuery = window.matchMedia('(max-width: 767px)');
+		isMobile = mobileQuery.matches;
+		onMobileChange = (e) => (isMobile = e.matches);
+		mobileQuery.addEventListener('change', onMobileChange);
+
+		// Shrink the chart once the top sentinel scrolls out of view.
+		scrollObserver = new IntersectionObserver(([entry]) => {
+			chartShrunk = !entry.isIntersecting;
+		});
+		if (topSentinel) {
+			scrollObserver.observe(topSentinel);
+		}
+
 		return () => {
 			observer.disconnect();
 		};
+	});
+
+	onDestroy(() => {
+		scrollObserver?.disconnect();
+		if (mobileQuery && onMobileChange) {
+			mobileQuery.removeEventListener('change', onMobileChange);
+		}
 	});
 
 	let selectedWeightEntry = $state<(WeightItem & { id: string }) | null>(null);
@@ -129,7 +164,8 @@
 
 	// TODO generate second weight curve with an averaged predictive curve 1 month into the future
 
-	const chartOptions = {
+	// Derived so the chart re-renders at the reduced height once `chartHeight` changes.
+	let chartOptions = $derived({
 		axes: {
 			left: {
 				mapsTo: 'value',
@@ -177,13 +213,17 @@
 			enabled: false
 		},
 		curve: 'curveMonotoneX',
-		height: '320px'
-	};
+		height: chartHeight
+	});
 </script>
 
 <svelte:head>
 	<title>CTrack - Weight</title>
 </svelte:head>
+<!-- Sentinel at the very top: while visible the chart stays full height; once it
+     scrolls out of view the chart shrinks (mobile only) to reclaim screen space. -->
+<div bind:this={topSentinel} class="h-px w-full" aria-hidden="true"></div>
+
 <Container title="Chart" sticky={true}>
 	<div class="flex w-full flex-col gap-4 px-4 pb-4">
 		<div class="card card-border bg-base-100 w-full items-center justify-center p-4 shadow">

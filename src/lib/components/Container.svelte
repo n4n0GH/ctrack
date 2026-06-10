@@ -13,6 +13,7 @@
 	let placeholderElement: HTMLElement | null = null;
 	let isFixed = $state(false);
 	let containerTopOffset = 0;
+	let resizeObserver: ResizeObserver | null = null;
 
 	function applyFixed() {
 		if (!containerElement || !placeholderElement || isFixed) return;
@@ -82,12 +83,24 @@
 		const rect = containerElement.getBoundingClientRect();
 		containerTopOffset = rect.top + window.scrollY;
 
+		// Keep the placeholder in sync with the container's height while fixed. The
+		// container's content can change size on its own (e.g. a chart that shrinks
+		// on scroll); without this the placeholder would over-reserve space and leave
+		// a gap below the fixed header.
+		resizeObserver = new ResizeObserver(() => {
+			if (isFixed && containerElement && placeholderElement) {
+				placeholderElement.style.height = containerElement.getBoundingClientRect().height + 'px';
+			}
+		});
+		resizeObserver.observe(containerElement);
+
 		window.addEventListener('scroll', onScroll, { passive: true });
 		window.addEventListener('resize', onResize);
 	});
 
 	onDestroy(() => {
 		if (browser) {
+			resizeObserver?.disconnect();
 			window.removeEventListener('scroll', onScroll);
 			window.removeEventListener('resize', onResize);
 			// Clean up placeholder if it exists

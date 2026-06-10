@@ -37,6 +37,19 @@
 	let sentinelElement: HTMLElement | null = $state(null);
 	let observer: IntersectionObserver | null = null;
 
+	// === Chart shrink-on-scroll (mobile) ===
+	// On small screens the chart eats a lot of vertical space, so we halve its
+	// height once the user scrolls past the top. A sentinel at the top of the
+	// page drives an IntersectionObserver: visible => full height, gone => shrunk.
+	let isMobile = $state(false);
+	let chartShrunk = $state(false);
+	let topSentinel: HTMLElement | null = $state(null);
+	let scrollObserver: IntersectionObserver | null = null;
+	let mobileQuery: MediaQueryList | null = null;
+	let onMobileChange: ((e: MediaQueryListEvent) => void) | null = null;
+
+	let chartHeight = $derived(isMobile && chartShrunk ? '160px' : '320px');
+
 	// === Weight data ===
 	let sortedWeights = userWeights.slice().sort((a, b) => b.date.seconds - a.date.seconds);
 
@@ -179,7 +192,8 @@
 	};
 
 	// === Chart options ===
-	let chartOptions = {
+	// Derived so the chart re-renders at the reduced height once `chartHeight` changes.
+	let chartOptions = $derived({
 		axes: {
 			left: {
 				mapsTo: 'value',
@@ -200,8 +214,8 @@
 			enabled: false
 		},
 		curve: 'curveMonotoneX',
-		height: '320px'
-	};
+		height: chartHeight
+	});
 
 	// === IntersectionObserver for lazy loading ===
 	onMount(() => {
@@ -219,16 +233,38 @@
 		if (sentinelElement) {
 			observer.observe(sentinelElement);
 		}
+
+		// Track viewport size so the chart only shrinks on mobile (< md breakpoint).
+		mobileQuery = window.matchMedia('(max-width: 767px)');
+		isMobile = mobileQuery.matches;
+		onMobileChange = (e) => (isMobile = e.matches);
+		mobileQuery.addEventListener('change', onMobileChange);
+
+		// Shrink the chart once the top sentinel scrolls out of view.
+		scrollObserver = new IntersectionObserver(([entry]) => {
+			chartShrunk = !entry.isIntersecting;
+		});
+		if (topSentinel) {
+			scrollObserver.observe(topSentinel);
+		}
 	});
 
 	onDestroy(() => {
 		observer?.disconnect();
+		scrollObserver?.disconnect();
+		if (mobileQuery && onMobileChange) {
+			mobileQuery.removeEventListener('change', onMobileChange);
+		}
 	});
 </script>
 
 <svelte:head>
 	<title>CTrack - Calories</title>
 </svelte:head>
+
+<!-- Sentinel at the very top: while visible the chart stays full height; once it
+     scrolls out of view the chart shrinks (mobile only) to reclaim screen space. -->
+<div bind:this={topSentinel} class="h-px w-full" aria-hidden="true"></div>
 
 <!-- Chart section - reflects visible entries only -->
 <Container title="Chart" sticky={true}>
