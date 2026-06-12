@@ -31,12 +31,22 @@ re-logging is fast. A line chart plots your daily net intake against your
 calorie target and TDEE, with summary stats (average intake, average TDEE, days
 tracked). The list is grouped by day and lazy-loads as you scroll.
 
+When adding intake you can also **scan a product barcode** (EAN/UPC) with your
+camera. The barcode is looked up against [Open Food Facts]; the product name and
+its energy value are pre-filled, and you set the portion in grams (energy is
+scaled from the per-100&nbsp;g figure). Lookups are cached locally, so repeat
+scans are instant and work offline. Manual entry continues to work exactly as
+before when you don't scan.
+
 ### Weight
 
 Track body weight over time, optionally with body-fat %, muscle % and visceral
-fat. The chart plots your weight against BMI thresholds (BMI 25/30/35) so you
-can see where you sit, and stats show total change, monthly average and current
-BMI. Entries lazy-load as you scroll and can be edited inline.
+fat. The chart plots your weight against BMI guide lines so you can see where you
+sit, and stats show total change, monthly average and current BMI. The three BMI
+lines adapt to you: they show the category boundaries surrounding your current
+BMI (derived from your weight and height), so they stay on-screen whether you're
+lean or heavy. You can also add your own custom reference lines (see
+**Settings**). Entries lazy-load as you scroll and can be edited inline.
 
 > On mobile, the charts on the Calories and Weight pages shrink to half height
 > once you scroll down, so the data list gets more of the screen.
@@ -45,6 +55,9 @@ BMI. Entries lazy-load as you scroll and can be edited inline.
 
 - Edit your profile: age, height, starting weight, gender, activity level, goal
   (loss / gain / maintain) and daily deficit.
+- **Weight Graph Lines** — add, edit and remove your own horizontal reference
+  lines on the weight chart (a goal weight, a population average, …). Each line
+  has a label, a value in kg and a colour.
 - **Cloud Sync (Firebase)** — connect, update or disconnect a Firestore project
   (see [Firestore integration](#firestore-integration)).
 - **Air-gapped credential transfer** — move your Firebase config between devices
@@ -72,9 +85,14 @@ Data is organised into these collections / object stores:
 | ----------------- | ------------------------------------- |
 | `userSettings`    | Profile and goal configuration        |
 | `weightHistory`   | Weight entries (+ optional body comp) |
+| `weightSettings`  | Custom weight-chart reference lines   |
 | `calorieIntake`   | Logged food / drink                   |
 | `calorieBurn`     | Logged exercise                       |
 | `activityHistory` | Activity-level history                |
+
+In addition, a local-only `foodCache` object store holds Open Food Facts barcode
+lookups. It is a regenerable cache — never synced to Firebase and never included
+in backups.
 
 ## Installation
 
@@ -170,5 +188,14 @@ local-only mode (your local data is kept).
 
 ## TODO
 
-- [ ] Add OpenFoodFacts API (https://openfoodfacts.github.io/openfoodfacts-server/api/)
+- [x] Add Open Food Facts barcode lookup
+      ([API](https://openfoodfacts.github.io/openfoodfacts-server/api/))
 - [ ] Generate a predictive weight curve projecting one month ahead
+
+## Attribution
+
+Food product data is provided by [Open Food Facts], a collaborative, free and
+open database, made available under the
+[Open Database License (ODbL)](https://opendatacommons.org/licenses/odbl/1-0/).
+
+[Open Food Facts]: https://world.openfoodfacts.org/
