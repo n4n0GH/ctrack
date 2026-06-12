@@ -5,6 +5,7 @@
 	import { LineChart, ScaleTypes } from '@carbon/charts-svelte';
 	import '@carbon/charts-svelte/styles.css';
 	import { userWeights } from '$lib/state/weight.svelte';
+	import { weightSettings } from '$lib/state/weightSettings.svelte';
 	import { toHumanDate } from '$lib/scripts/helpers';
 	import { settings } from '$lib/state/settings.svelte';
 	import { getBmiLabel, getFatLevel } from '$lib/scripts/helpers';
@@ -187,11 +188,12 @@
 						label: 'BMI 25 - ' + getBmiLabel(25),
 						fillColor: '#fd9a00'
 					},
-					{
-						value: 85.8,
-						label: 'Average German Man',
-						fillColor: '#00bc7d'
-					}
+					// User-defined reference lines, managed on the settings page.
+					...weightSettings.map((line) => ({
+						value: line.value,
+						label: line.label,
+						fillColor: line.color
+					}))
 				]
 			},
 			bottom: {

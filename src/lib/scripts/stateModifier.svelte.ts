@@ -1,9 +1,16 @@
 import { settings } from '$lib/state/settings.svelte';
 import { userWeights } from '$lib/state/weight.svelte';
+import { weightSettings } from '$lib/state/weightSettings.svelte';
 import { calories } from '$lib/state/calories.svelte';
 import { activity } from '$lib/state/activityHistory.svelte';
 import { findNewestWeight, findHighestWeight, findLowestWeight } from '$lib/scripts/helpers';
-import type { UserSettings, WeightItem, EnergyItem, ActivityHistoryItem } from '$lib/data/types';
+import type {
+	UserSettings,
+	WeightItem,
+	WeightSettingItem,
+	EnergyItem,
+	ActivityHistoryItem
+} from '$lib/data/types';
 import type { DocumentData } from 'firebase/firestore';
 
 /* == Data loaded tracking == */
@@ -62,6 +69,18 @@ export const updateWeightItem = (updatedItem: WeightItem) => {
 		userWeights[index] = { ...userWeights[index], ...updatedItem };
 		syncWeightTiers();
 	}
+};
+
+/* == Weight Settings (chart reference lines) == */
+
+export const initWeightSettings = (dataset: (WeightSettingItem | DocumentData)[]) => {
+	weightSettings.push(...dataset);
+};
+
+// Replace the whole list in place (the editor saves it wholesale) while keeping
+// the same reactive array reference so subscribers update.
+export const setWeightSettings = (items: (WeightSettingItem | DocumentData)[]) => {
+	weightSettings.splice(0, weightSettings.length, ...items);
 };
 
 /* == Calorie Related == */

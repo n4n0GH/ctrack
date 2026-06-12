@@ -6,9 +6,11 @@
 	import QrScanner from '$lib/components/QrScanner.svelte';
 	import { settings } from '$lib/state/settings.svelte';
 	import { userWeights } from '$lib/state/weight.svelte';
+	import { weightSettings } from '$lib/state/weightSettings.svelte';
 	import { calories } from '$lib/state/calories.svelte';
 	import { activity } from '$lib/state/activityHistory.svelte';
 	import { dataLoaded, updateSettings } from '$lib/scripts/stateModifier.svelte';
+	import { WeightSettings } from '$lib/scripts/dataInit';
 	import Container from '$lib/components/Container.svelte';
 	import {
 		fullSyncFromFirebase,
@@ -24,7 +26,7 @@
 	} from '$lib/middleware/storage';
 	import type { BackupFile } from '$lib/middleware/storage';
 	import { activityLevels, goalOptions } from '$lib/data/options';
-	import type { UserGoal, UserSettings, FirebaseConfig } from '$lib/data/types';
+	import type { UserGoal, UserSettings, FirebaseConfig, WeightSettingItem } from '$lib/data/types';
 
 	// Whether a Firebase config is active on this device. Read once on mount; the
 	// save/clear handlers reload the page so a fresh config initialises at boot.
@@ -140,9 +142,7 @@
 
 	async function handleForceUpdate() {
 		if (
-			!confirm(
-				'Force update to the latest version? Your local data is kept; the app will reload.'
-			)
+			!confirm('Force update to the latest version? Your local data is kept; the app will reload.')
 		) {
 			return;
 		}
@@ -306,12 +306,70 @@
 		}
 	}
 
+	// === Weight chart reference lines ===
+	// Working copy of the weightSettings collection, edited as a list of rows.
+	// Seeded from reactive state (loaded at boot); on save the list is persisted
+	// wholesale and re-seeded with the canonical ids returned by the writer.
+	type WeightLine = { id?: string; label: string; value: number; color: string };
+
+	const toWeightLines = (items: (WeightSettingItem | Record<string, unknown>)[]): WeightLine[] =>
+		items.map((l) => ({
+			id: (l as WeightSettingItem).id,
+			label: (l as WeightSettingItem).label,
+			value: (l as WeightSettingItem).value,
+			color: (l as WeightSettingItem).color
+		}));
+
+	let weightLines = $state<WeightLine[]>(toWeightLines(weightSettings));
+	const weightSettingsApi = new WeightSettings();
+
+	let savingWeightLines = $state(false);
+	let weightLinesSaved = $state(false);
+	let weightLinesError = $state(false);
+
+	const addWeightLine = () => {
+		weightLines.push({ label: '', value: 0, color: '#00bc7d' });
+	};
+
+	const removeWeightLine = (index: number) => {
+		weightLines.splice(index, 1);
+	};
+
+	async function handleWeightLinesSave() {
+		savingWeightLines = true;
+		weightLinesSaved = false;
+		weightLinesError = false;
+
+		try {
+			const items: WeightSettingItem[] = $state.snapshot(weightLines).map((line) => ({
+				id: line.id,
+				label: line.label.trim(),
+				value: Number(line.value),
+				color: line.color
+			}));
+			const result = await weightSettingsApi.save(items);
+			if (result.success) {
+				// Re-seed the editor so newly added rows pick up their generated ids.
+				weightLines = toWeightLines(result.data);
+				weightLinesSaved = true;
+			} else {
+				weightLinesError = true;
+			}
+		} catch (e) {
+			console.error('Failed to save weight settings:', e);
+			weightLinesError = true;
+		} finally {
+			savingWeightLines = false;
+		}
+	}
+
 	let syncing = $state(false);
 	let syncSuccess = $state(false);
 	let syncError = $state(false);
 	let syncResult = $state<{
 		settings: number;
 		weights: number;
+		weightSettings: number;
 		intake: number;
 		burn: number;
 		activity: number;
@@ -324,6 +382,7 @@
 	let persistResult = $state<{
 		settings: number;
 		weights: number;
+		weightSettings: number;
 		intake: number;
 		burn: number;
 		activity: number;
@@ -363,6 +422,7 @@
 			persistResult = await persistInMemoryToIndexedDB({
 				settings: $state.snapshot(settings),
 				weights: $state.snapshot(userWeights),
+				weightSettings: $state.snapshot(weightSettings),
 				intake: $state.snapshot(calories.intake),
 				burned: $state.snapshot(calories.burned),
 				activity: $state.snapshot(activity.history)
@@ -488,6 +548,109 @@
 				disabled={savingSettings}
 			>
 				{#if savingSettings}
+					Saving...
+				{:else}
+					Update
+				{/if}
+			</button>
+		{/snippet}
+	</Container>
+	<Container title="Weight Graph Lines">
+		<div class="flex w-full flex-col gap-4 px-4 pb-2">
+			<p class="text-sm opacity-70">
+				Horizontal reference lines drawn across the weight chart — e.g. a goal weight or a
+				population average. Add as many as you like.
+			</p>
+
+			{#each weightLines as line, i (i)}
+				<div class="flex flex-wrap items-end gap-2">
+					<label class="floating-label grow">
+						<span>Label</span>
+						<input
+							type="text"
+							class="input input-bordered w-full"
+							placeholder="Label"
+							bind:value={line.label}
+						/>
+					</label>
+					<label class="floating-label">
+						<span>Value (kg)</span>
+						<input
+							type="number"
+							step="0.1"
+							class="input input-bordered w-28"
+							placeholder="Value (kg)"
+							bind:value={line.value}
+						/>
+					</label>
+					<label class="floating-label">
+						<span>Color</span>
+						<input
+							type="color"
+							class="input input-bordered h-10 w-16 p-1"
+							bind:value={line.color}
+						/>
+					</label>
+					<button
+						type="button"
+						class="btn btn-soft btn-error btn-square"
+						aria-label="Remove line"
+						onclick={() => removeWeightLine(i)}
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke-width="1.5"
+							stroke="currentColor"
+							class="size-5"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
+							/>
+						</svg>
+					</button>
+				</div>
+			{/each}
+
+			<button
+				type="button"
+				class="btn btn-soft btn-success btn-sm self-start"
+				onclick={addWeightLine}
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					fill="none"
+					viewBox="0 0 24 24"
+					stroke-width="1.5"
+					stroke="currentColor"
+					class="size-5"
+				>
+					<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+				</svg>
+				Add Line
+			</button>
+
+			{#if weightLinesSaved}
+				<div role="alert" class="alert alert-success">
+					<span>Graph lines saved.</span>
+				</div>
+			{/if}
+			{#if weightLinesError}
+				<div role="alert" class="alert alert-error">
+					<span>Failed to save graph lines.</span>
+				</div>
+			{/if}
+		</div>
+		{#snippet clickable()}
+			<button
+				class="btn btn-soft btn-success grow"
+				onclick={handleWeightLinesSave}
+				disabled={savingWeightLines}
+			>
+				{#if savingWeightLines}
 					Saving...
 				{:else}
 					Update
@@ -644,7 +807,13 @@
 					<span>Failed to generate the QR code.</span>
 				</div>
 			{:else if qrDataUrl}
-				<img src={qrDataUrl} alt="Firebase config QR code" class="bg-white p-2" width="320" height="320" />
+				<img
+					src={qrDataUrl}
+					alt="Firebase config QR code"
+					class="bg-white p-2"
+					width="320"
+					height="320"
+				/>
 				<p class="text-center text-sm opacity-70">
 					Open Settings → Cloud Sync → Scan QR on the other device and point it here.
 				</p>
@@ -658,7 +827,11 @@
 		</form>
 	</dialog>
 
-	<dialog id="qrScanModal" class="modal modal-bottom sm:modal-middle" onclose={() => (scanOpen = false)}>
+	<dialog
+		id="qrScanModal"
+		class="modal modal-bottom sm:modal-middle"
+		onclose={() => (scanOpen = false)}
+	>
 		<div class="modal-box flex flex-col items-center gap-3">
 			<h3 class="text-lg font-semibold">Scan config QR</h3>
 			{#if scanOpen}
@@ -721,7 +894,8 @@
 				</svg>
 				<span
 					>Synced: {syncResult.settings} settings, {syncResult.weights} weights,
-					{syncResult.intake} intake, {syncResult.burn} burn, {syncResult.activity} activity</span
+					{syncResult.weightSettings} lines, {syncResult.intake} intake, {syncResult.burn} burn,
+					{syncResult.activity} activity</span
 				>
 			</div>
 		{/if}
@@ -762,7 +936,8 @@
 				</svg>
 				<span
 					>Persisted: {persistResult.settings} settings, {persistResult.weights} weights,
-					{persistResult.intake} intake, {persistResult.burn} burn, {persistResult.activity} activity</span
+					{persistResult.weightSettings} lines, {persistResult.intake} intake, {persistResult.burn}
+					burn, {persistResult.activity} activity</span
 				>
 			</div>
 		{/if}
@@ -987,7 +1162,14 @@
 						fill="none"
 						viewBox="0 0 24 24"
 					>
-						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+						<circle
+							class="opacity-25"
+							cx="12"
+							cy="12"
+							r="10"
+							stroke="currentColor"
+							stroke-width="4"
+						/>
 						<path
 							class="opacity-75"
 							fill="currentColor"

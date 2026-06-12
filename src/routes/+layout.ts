@@ -68,6 +68,7 @@ export const load = async () => {
 		pushTo.settings(newSettings);
 		init.calories({ intake: data.intake, burned: data.burned });
 		init.weights(fweights);
+		init.weightSettings(data.weightSettings);
 		init.activities({ history: data.activity });
 	} catch (e) {
 		// Last-resort guard: whatever goes wrong, the app must still boot with a

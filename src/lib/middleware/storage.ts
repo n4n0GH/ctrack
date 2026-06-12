@@ -15,6 +15,7 @@ import type {
 	WeightItem,
 	ActivityHistoryItem,
 	UserSettings,
+	WeightSettingItem,
 	OutboxOperation
 } from '$lib/data/types';
 
@@ -56,6 +57,7 @@ export const getFirebaseStatus = (): boolean => isFirebaseAvailable;
 export interface InitialData {
 	settings: UserSettings | undefined;
 	weights: WeightItem[];
+	weightSettings: WeightSettingItem[];
 	intake: EnergyItem[];
 	burned: EnergyItem[];
 	activity: ActivityHistoryItem[];
@@ -64,6 +66,7 @@ export interface InitialData {
 const EMPTY_INITIAL_DATA: InitialData = {
 	settings: undefined,
 	weights: [],
+	weightSettings: [],
 	intake: [],
 	burned: [],
 	activity: []
@@ -86,6 +89,7 @@ const readLocal = async (): Promise<InitialData> => {
 	return {
 		settings: await safe(() => idb.getUserSettings(), undefined),
 		weights: await safe(() => idb.getUserWeight(), []),
+		weightSettings: await safe(() => idb.getWeightSettings(), []),
 		intake: await safe(() => idb.getCalories('calorieIntake'), []),
 		burned: await safe(() => idb.getCalories('calorieBurn'), []),
 		activity: await safe(() => idb.getActivityHistory(), [])
@@ -311,6 +315,47 @@ export const updateUserSettings = async (
 	}
 
 	return { success: localSaved, data: settings };
+};
+
+/**
+ * Persists the full set of weight-chart reference lines local-first. The editor
+ * manages the list as a whole (adds, edits, removals), so this replaces the
+ * collection wholesale: IndexedDB is cleared and rewritten, then — when Firebase
+ * is reachable — any documents no longer present are deleted and the current set
+ * is written. New rows are stamped with a shared id so the local and remote key
+ * spaces stay aligned. Never throws; success reflects the local write.
+ *
+ * @returns the canonical list, every item carrying its id.
+ */
+export const replaceWeightSettings = async (
+	items: WeightSettingItem[]
+): Promise<{ success: boolean; data: WeightSettingItem[] }> => {
+	const withIds: WeightSettingItem[] = items.map((item) => ({ ...item, id: item.id ?? newId() }));
+
+	let localSaved = false;
+	try {
+		await idb.saveWeightSettings(withIds);
+		localSaved = true;
+	} catch (e) {
+		console.warn('Failed to persist weight settings locally:', e);
+	}
+
+	if (isFirebaseAvailable && fb.isFirebaseConfigured()) {
+		try {
+			// Remove any remote docs the user deleted, then write the current set.
+			const remote = await fb.getWeightSettings();
+			const keepIds = new Set(withIds.map((item) => item.id));
+			for (const doc of remote) {
+				if (!keepIds.has(doc.id)) await fb.deleteWeightSetting(doc.id);
+			}
+			for (const item of withIds) await fb.setWeightSetting(item);
+		} catch (e) {
+			console.warn('Failed to persist weight settings to Firebase:', e);
+			isFirebaseAvailable = false;
+		}
+	}
+
+	return { success: localSaved, data: withIds };
 };
 
 export const updateWeight = async (docId: string, updateItem: WeightItem) => {

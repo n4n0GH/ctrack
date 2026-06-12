@@ -8,6 +8,7 @@ import {
 	addDoc,
 	setDoc,
 	updateDoc,
+	deleteDoc,
 	Timestamp
 } from 'firebase/firestore/lite';
 import { getFirebaseConfig } from '$lib/middleware/idb';
@@ -17,7 +18,8 @@ import type {
 	EnergyItem,
 	WeightItem,
 	ActivityHistoryItem,
-	UserSettings
+	UserSettings,
+	WeightSettingItem
 } from '$lib/data/types';
 
 // The Firebase client is initialised lazily from the user-supplied config stored
@@ -127,6 +129,60 @@ export const updateUserSettings = async (settings: UserSettings) => {
 		updateSuccess = false;
 	}
 	return { success: updateSuccess, data: settings };
+};
+
+/**
+ * fetches the weight chart reference lines from firebase
+ * @returns the list of weight setting objects (each with its document id)
+ */
+export const getWeightSettings = async () => {
+	const settingsCol = collection(requireDb(), 'weightSettings');
+	const snapshot = await getDocs(settingsCol);
+	return snapshot.docs.map((doc) => {
+		return {
+			id: doc.id,
+			...doc.data()
+		};
+	});
+};
+
+/**
+ * creates or overwrites a weight setting document. Uses the client-generated id
+ * as the document id (via setDoc) so the same write is idempotent and an edit
+ * always targets the existing record rather than duplicating it.
+ * @param item the weight setting to persist
+ */
+export const setWeightSetting = async (item: WeightSettingItem) => {
+	let updateSuccess = false;
+	const { id, ...payload } = item;
+	try {
+		if (id) {
+			await setDoc(doc(requireDb(), 'weightSettings', id), payload);
+		} else {
+			await addDoc(collection(requireDb(), 'weightSettings'), payload);
+		}
+		updateSuccess = true;
+	} catch (e) {
+		console.error(e);
+		updateSuccess = false;
+	}
+	return { success: updateSuccess, data: item };
+};
+
+/**
+ * deletes a weight setting document by id.
+ * @param docId the firebase document id to remove
+ */
+export const deleteWeightSetting = async (docId: string) => {
+	let deleteSuccess = false;
+	try {
+		await deleteDoc(doc(requireDb(), 'weightSettings', docId));
+		deleteSuccess = true;
+	} catch (e) {
+		console.error(e);
+		deleteSuccess = false;
+	}
+	return { success: deleteSuccess };
 };
 
 /**

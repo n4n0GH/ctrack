@@ -9,6 +9,7 @@ import type {
 	WeightItem,
 	ActivityHistoryItem,
 	UserSettings,
+	WeightSettingItem,
 	OutboxOperation,
 	OutboxEntry,
 	FirebaseConfig
@@ -18,12 +19,14 @@ const DB_NAME = 'ctrack-db';
 // v2: outbox store for deferred Firebase writes.
 // v3: data stores re-keyed onto Firebase document ids (shared id space).
 // v4: firebaseConfig store holding the user-supplied Firebase identifiers.
-const DB_VERSION = 4;
+// v5: weightSettings store holding the weight-chart reference lines.
+const DB_VERSION = 5;
 
 // Collection names matching Firebase
 const STORES = {
 	settings: 'userSettings',
 	weight: 'weightHistory',
+	weightSettings: 'weightSettings',
 	intake: 'calorieIntake',
 	burn: 'calorieBurn',
 	activity: 'activityHistory'
@@ -193,6 +196,35 @@ export const getUserSettings = async (): Promise<UserSettings | undefined> => {
 export const getUserWeight = async (): Promise<WeightItem[]> => {
 	if (!browser) return [];
 	return getAll<WeightItem>(STORES.weight);
+};
+
+/**
+ * Fetches the weight chart reference lines from IndexedDB
+ */
+export const getWeightSettings = async (): Promise<WeightSettingItem[]> => {
+	if (!browser) return [];
+	return getAll<WeightSettingItem>(STORES.weightSettings);
+};
+
+/**
+ * Replaces the entire weight settings collection with the given set. The list is
+ * small and fully user-managed, so a clear-and-rewrite keeps local state an exact
+ * mirror of the editor (handling adds, edits and removals in one pass). Records
+ * keep their `id` so the IndexedDB and Firebase key spaces stay aligned.
+ */
+export const saveWeightSettings = async (items: WeightSettingItem[]): Promise<void> => {
+	if (!browser) return;
+	const db = await openDb();
+	const tx = db.transaction(STORES.weightSettings, 'readwrite');
+	const store = tx.objectStore(STORES.weightSettings);
+	store.clear();
+	for (const item of items) {
+		store.put(item as unknown as Record<string, unknown>);
+	}
+	return new Promise((resolve, reject) => {
+		tx.oncomplete = () => resolve();
+		tx.onerror = () => reject(tx.error);
+	});
 };
 
 /**
@@ -542,13 +574,22 @@ export const getIdbCount = async (storeName: StoreName): Promise<number> => {
 export const syncFromFirebase = async (): Promise<{
 	settings: number;
 	weights: number;
+	weightSettings: number;
 	intake: number;
 	burn: number;
 	activity: number;
 	synced: boolean;
 }> => {
 	if (!browser) {
-		return { settings: 0, weights: 0, intake: 0, burn: 0, activity: 0, synced: false };
+		return {
+			settings: 0,
+			weights: 0,
+			weightSettings: 0,
+			intake: 0,
+			burn: 0,
+			activity: 0,
+			synced: false
+		};
 	}
 	// Lazy import to avoid circular dependency issues at module load time
 	const fb = await import('$lib/middleware/firebase');
@@ -556,6 +597,7 @@ export const syncFromFirebase = async (): Promise<{
 	const results = {
 		settings: 0,
 		weights: 0,
+		weightSettings: 0,
 		intake: 0,
 		burn: 0,
 		activity: 0,
@@ -603,7 +645,7 @@ export const syncFromFirebase = async (): Promise<{
 	const syncCollection = async (
 		storeName: StoreName,
 		fbFetch: () => Promise<Record<string, unknown>[]>,
-		fieldKey: 'settings' | 'weights' | 'intake' | 'burn' | 'activity'
+		fieldKey: 'settings' | 'weights' | 'weightSettings' | 'intake' | 'burn' | 'activity'
 	): Promise<void> => {
 		try {
 			// Fetch Firebase data once - reuse for both comparison and sync
@@ -633,6 +675,23 @@ export const syncFromFirebase = async (): Promise<{
 	// Sync weight history
 	await syncCollection(STORES.weight, async () => await fb.getUserWeight(), 'weights');
 
+	// Weight chart reference lines: a small, fully-managed config set with replace
+	// semantics (edited in place by id), so the append-only "more remote = newer"
+	// count heuristic the other collections use does not apply — a remote entry
+	// would never be pulled once local holds an equal-or-greater count. Mirror
+	// Firebase authoritatively whenever it returns any lines; when it returns none,
+	// leave the local set untouched so lines added offline (not yet pushed) survive.
+	try {
+		const remoteLines = await fb.getWeightSettings();
+		if (remoteLines.length > 0) {
+			await clearStore(STORES.weightSettings);
+			results.weightSettings = await bulkAdd(STORES.weightSettings, remoteLines);
+			results.synced = true;
+		}
+	} catch (err) {
+		console.warn('Failed to sync weightSettings from Firebase:', err);
+	}
+
 	// Sync calorie intake
 	await syncCollection(STORES.intake, async () => await fb.getCalories('calorieIntake'), 'intake');
 
@@ -655,13 +714,22 @@ export const syncFromFirebase = async (): Promise<{
 export const fullSyncFromFirebase = async (): Promise<{
 	settings: number;
 	weights: number;
+	weightSettings: number;
 	intake: number;
 	burn: number;
 	activity: number;
 	failedCollections: string[];
 }> => {
 	if (!browser) {
-		return { settings: 0, weights: 0, intake: 0, burn: 0, activity: 0, failedCollections: [] };
+		return {
+			settings: 0,
+			weights: 0,
+			weightSettings: 0,
+			intake: 0,
+			burn: 0,
+			activity: 0,
+			failedCollections: []
+		};
 	}
 	// Lazy import to avoid circular dependency issues at module load time
 	const fb = await import('$lib/middleware/firebase');
@@ -669,7 +737,15 @@ export const fullSyncFromFirebase = async (): Promise<{
 	// Guard *before* wiping anything: with Firebase unconfigured there is no
 	// source to repopulate from, so clearing would just destroy local data.
 	if (!(await fb.initFirebase())) {
-		return { settings: 0, weights: 0, intake: 0, burn: 0, activity: 0, failedCollections: [] };
+		return {
+			settings: 0,
+			weights: 0,
+			weightSettings: 0,
+			intake: 0,
+			burn: 0,
+			activity: 0,
+			failedCollections: []
+		};
 	}
 
 	// Wipe all local data before pulling fresh data from Firebase
@@ -678,6 +754,7 @@ export const fullSyncFromFirebase = async (): Promise<{
 	const results = {
 		settings: 0,
 		weights: 0,
+		weightSettings: 0,
 		intake: 0,
 		burn: 0,
 		activity: 0,
@@ -709,7 +786,7 @@ export const fullSyncFromFirebase = async (): Promise<{
 	const syncCollection = async (
 		storeName: StoreName,
 		fbFetch: () => Promise<Record<string, unknown>[]>,
-		fieldKey: 'settings' | 'weights' | 'intake' | 'burn' | 'activity'
+		fieldKey: 'settings' | 'weights' | 'weightSettings' | 'intake' | 'burn' | 'activity'
 	): Promise<void> => {
 		try {
 			const fbData = await fbFetch();
@@ -736,6 +813,13 @@ export const fullSyncFromFirebase = async (): Promise<{
 	// Sync weight history
 	await syncCollection(STORES.weight, async () => await fb.getUserWeight(), 'weights');
 
+	// Sync weight chart reference lines
+	await syncCollection(
+		STORES.weightSettings,
+		async () => await fb.getWeightSettings(),
+		'weightSettings'
+	);
+
 	// Sync calorie intake
 	await syncCollection(STORES.intake, async () => await fb.getCalories('calorieIntake'), 'intake');
 
@@ -759,18 +843,20 @@ export const fullSyncFromFirebase = async (): Promise<{
 export const persistInMemoryToIndexedDB = async (data: {
 	settings: UserSettings;
 	weights: Record<string, unknown>[];
+	weightSettings: Record<string, unknown>[];
 	intake: Record<string, unknown>[];
 	burned: Record<string, unknown>[];
 	activity: Record<string, unknown>[];
 }): Promise<{
 	settings: number;
 	weights: number;
+	weightSettings: number;
 	intake: number;
 	burn: number;
 	activity: number;
 }> => {
 	if (!browser) {
-		return { settings: 0, weights: 0, intake: 0, burn: 0, activity: 0 };
+		return { settings: 0, weights: 0, weightSettings: 0, intake: 0, burn: 0, activity: 0 };
 	}
 
 	// Wipe all local data first
@@ -779,6 +865,7 @@ export const persistInMemoryToIndexedDB = async (data: {
 	const results = {
 		settings: 0,
 		weights: 0,
+		weightSettings: 0,
 		intake: 0,
 		burn: 0,
 		activity: 0
@@ -820,6 +907,15 @@ export const persistInMemoryToIndexedDB = async (data: {
 			results.weights = await bulkAdd(STORES.weight, data.weights);
 		} catch (err) {
 			console.warn('Failed to persist weights:', err);
+		}
+	}
+
+	// Persist weight chart reference lines
+	if (data.weightSettings.length > 0) {
+		try {
+			results.weightSettings = await bulkAdd(STORES.weightSettings, data.weightSettings);
+		} catch (err) {
+			console.warn('Failed to persist weight settings:', err);
 		}
 	}
 

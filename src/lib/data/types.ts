@@ -31,6 +31,18 @@ export type SortedWeights = {
 	atl: number;
 };
 
+/**
+ * A user-defined reference line drawn on the weight chart (e.g. a target weight
+ * or a population average). Managed on the settings page and persisted to the
+ * `weightSettings` collection. `color` is a hex string with a leading '#'.
+ */
+export type WeightSettingItem = {
+	label: string;
+	value: number;
+	color: string;
+	id?: string | undefined;
+};
+
 export type UserGoal = 'loss' | 'gain' | 'maintain';
 
 export type UserSettings = {

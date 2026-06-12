@@ -6,13 +6,16 @@ import {
 	addCalories,
 	addWeight,
 	updateCalories,
-	updateWeight as updateWeightFb
+	updateWeight as updateWeightFb,
+	replaceWeightSettings
 } from '$lib/middleware/storage';
 import { findNewestWeight, findHighestWeight, findLowestWeight } from '$lib/scripts/helpers';
 import {
 	updateSettings,
 	addUserWeight,
 	initUserWeight,
+	initWeightSettings,
+	setWeightSettings,
 	updateIntake,
 	updateBurn,
 	initCalories,
@@ -25,6 +28,7 @@ import type {
 	SortedWeights,
 	UserSettings,
 	WeightItem,
+	WeightSettingItem,
 	CalorieSelector,
 	EnergyItem,
 	ActivityHistoryItem
@@ -50,6 +54,18 @@ export class Fetch {
 	}
 }
 
+export class WeightSettings {
+	/**
+	 * Persists the edited reference-line set wholesale and mirrors the canonical
+	 * (id-stamped) result into reactive state so the chart updates immediately.
+	 */
+	async save(items: WeightSettingItem[]) {
+		const result = await replaceWeightSettings(items);
+		if (result.success) setWeightSettings(result.data);
+		return result;
+	}
+}
+
 export class Init {
 	calories(dataset: {
 		intake: (EnergyItem | DocumentData)[];
@@ -59,6 +75,9 @@ export class Init {
 	}
 	weights(dataset: (WeightItem | DocumentData)[]) {
 		initUserWeight(dataset);
+	}
+	weightSettings(dataset: (WeightSettingItem | DocumentData)[]) {
+		initWeightSettings(dataset);
 	}
 	activities(dataset: { history: (ActivityHistoryItem | DocumentData)[] }) {
 		initActivityHistory(dataset);
