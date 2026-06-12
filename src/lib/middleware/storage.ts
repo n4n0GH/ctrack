@@ -9,6 +9,7 @@
 import { browser } from '$app/environment';
 import * as fb from '$lib/middleware/firebase';
 import * as idb from '$lib/middleware/idb';
+import * as off from '$lib/middleware/offFoodFacts';
 import type {
 	CalorieSelector,
 	EnergyItem,
@@ -16,6 +17,7 @@ import type {
 	ActivityHistoryItem,
 	UserSettings,
 	WeightSettingItem,
+	FoodProduct,
 	OutboxOperation
 } from '$lib/data/types';
 
@@ -187,6 +189,40 @@ export const getCalories = async (path: CalorieSelector) => {
 	} catch {
 		isFirebaseAvailable = false;
 		return idb.getCalories(path);
+	}
+};
+
+// ======================== Food lookup (Open Food Facts) ========================
+
+/**
+ * Looks up a food product by barcode, cache-first. A cached hit returns
+ * instantly and works offline; on a miss the product is fetched from Open Food
+ * Facts and cached for next time. Keeping reads cache-first also keeps us well
+ * under OFF's per-IP rate limits. Never throws — a network failure or unknown
+ * barcode resolves to null so the UI can fall back to manual entry.
+ */
+export const lookupFood = async (barcode: string): Promise<FoodProduct | null> => {
+	if (!browser) return null;
+	try {
+		const cached = await idb.getCachedFood(barcode);
+		if (cached) return cached;
+	} catch (e) {
+		console.warn('Food cache read failed:', e);
+	}
+
+	try {
+		const product = await off.fetchProductByBarcode(barcode);
+		if (product) {
+			try {
+				await idb.putCachedFood(product);
+			} catch (e) {
+				console.warn('Food cache write failed:', e);
+			}
+		}
+		return product;
+	} catch (e) {
+		console.warn('Open Food Facts lookup failed:', e);
+		return null;
 	}
 };
 

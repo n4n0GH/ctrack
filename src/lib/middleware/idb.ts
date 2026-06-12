@@ -10,6 +10,7 @@ import type {
 	ActivityHistoryItem,
 	UserSettings,
 	WeightSettingItem,
+	FoodProduct,
 	OutboxOperation,
 	OutboxEntry,
 	FirebaseConfig
@@ -20,7 +21,8 @@ const DB_NAME = 'ctrack-db';
 // v3: data stores re-keyed onto Firebase document ids (shared id space).
 // v4: firebaseConfig store holding the user-supplied Firebase identifiers.
 // v5: weightSettings store holding the weight-chart reference lines.
-const DB_VERSION = 5;
+// v6: foodCache store holding Open Food Facts lookups, keyed by barcode.
+const DB_VERSION = 6;
 
 // Collection names matching Firebase
 const STORES = {
@@ -41,6 +43,11 @@ const OUTBOX_STORE = 'outbox';
 // settings, and excluded from backups since it is device-specific.
 const CONFIG_STORE = 'firebaseConfig';
 const CONFIG_KEY = 'config';
+
+// Caches Open Food Facts barcode lookups (keyed by barcode). Kept out of STORES
+// so a data sync/clear never wipes it, and excluded from backups since it is a
+// regenerable cache, not user data.
+const FOOD_CACHE_STORE = 'foodCache';
 
 type StoreName = (typeof STORES)[keyof typeof STORES];
 
@@ -81,6 +88,10 @@ const openDb = (): Promise<IDBDatabase> => {
 			// `id` keyPath keeps put() key-less and consistent with the other stores.
 			if (!db.objectStoreNames.contains(CONFIG_STORE)) {
 				db.createObjectStore(CONFIG_STORE, { keyPath: 'id' });
+			}
+			// Open Food Facts lookup cache, keyed by the product barcode.
+			if (!db.objectStoreNames.contains(FOOD_CACHE_STORE)) {
+				db.createObjectStore(FOOD_CACHE_STORE, { keyPath: 'barcode' });
 			}
 		};
 
@@ -469,6 +480,36 @@ export const clearFirebaseConfig = async (): Promise<void> => {
 	});
 };
 
+// ==================== FOOD CACHE (Open Food Facts) ====================
+
+/**
+ * Returns a cached Open Food Facts product by barcode, or null when not cached.
+ */
+export const getCachedFood = async (barcode: string): Promise<FoodProduct | null> => {
+	if (!browser) return null;
+	const db = await openDb();
+	const tx = db.transaction(FOOD_CACHE_STORE, 'readonly');
+	const request = tx.objectStore(FOOD_CACHE_STORE).get(barcode);
+	return new Promise((resolve, reject) => {
+		request.onsuccess = () => resolve((request.result as FoodProduct | undefined) ?? null);
+		request.onerror = () => reject(request.error);
+	});
+};
+
+/**
+ * Stores an Open Food Facts product in the cache (keyed by its barcode).
+ */
+export const putCachedFood = async (product: FoodProduct): Promise<void> => {
+	if (!browser) return;
+	const db = await openDb();
+	const tx = db.transaction(FOOD_CACHE_STORE, 'readwrite');
+	tx.objectStore(FOOD_CACHE_STORE).put(product);
+	return new Promise((resolve, reject) => {
+		tx.oncomplete = () => resolve();
+		tx.onerror = () => reject(tx.error);
+	});
+};
+
 // ==================== BACKUP / RESTORE ====================
 
 /**
@@ -499,9 +540,9 @@ export const exportDatabase = async (): Promise<BackupFile> => {
 
 	const db = await openDb();
 	for (const name of Array.from(db.objectStoreNames)) {
-		// The Firebase config is device-specific connection state, not user data,
-		// so it is deliberately left out of portable backups.
-		if (name === CONFIG_STORE) continue;
+		// The Firebase config is device-specific connection state and the food
+		// cache is regenerable, so neither belongs in a portable backup.
+		if (name === CONFIG_STORE || name === FOOD_CACHE_STORE) continue;
 		base.stores[name] = await new Promise<unknown[]>((resolve, reject) => {
 			const tx = db.transaction(name, 'readonly');
 			const request = tx.objectStore(name).getAll();

@@ -61,6 +61,21 @@ export type UserSettings = {
 export type CalorieSelector = 'calorieBurn' | 'calorieIntake';
 
 /**
+ * A food product looked up from Open Food Facts by barcode, normalised to just
+ * the fields the calorie logger needs. Energy is per 100 g (OFF's canonical
+ * unit); the optional serving fields are used to pre-fill a sensible portion.
+ * Cached in IndexedDB keyed by barcode to respect OFF's rate limits and to work
+ * offline.
+ */
+export type FoodProduct = {
+	barcode: string;
+	name: string;
+	kcal100: number;
+	servingGrams?: number;
+	kcalServing?: number;
+};
+
+/**
  * The user-supplied Firebase web app configuration. These are public project
  * identifiers (not secrets), entered on the settings page and stored locally in
  * IndexedDB so each device can point at the user's own Firebase project.

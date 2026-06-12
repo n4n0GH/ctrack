@@ -33,6 +33,7 @@
 	},
 	"dependencies": {
 		"@carbon/charts-svelte": "^1.22.18",
+		"@zxing/browser": "^0.2.0",
 		"daisyui": "^5.0.43",
 		"firebase": "^11.10.0",
 		"jsqr": "^1.4.0",
