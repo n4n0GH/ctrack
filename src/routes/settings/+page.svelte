@@ -169,6 +169,7 @@
 		activityFactor: number;
 		deficit: number;
 		goal: UserGoal;
+		showPrediction: boolean;
 	}>({
 		age: settings.age,
 		height: settings.height,
@@ -176,7 +177,8 @@
 		gender: settings.gender,
 		activityFactor: settings.activityFactor,
 		deficit: settings.deficit,
-		goal: settings.goal
+		goal: settings.goal,
+		showPrediction: settings.showPrediction
 	});
 
 	let savingSettings = $state(false);
@@ -286,7 +288,8 @@
 				gender: form.gender,
 				activityFactor: Number(form.activityFactor),
 				deficit: Number(form.deficit),
-				goal: form.goal
+				goal: form.goal,
+				showPrediction: form.showPrediction
 			};
 
 			// Update reactive state first so BMR/TDEE recalculate immediately,
@@ -529,6 +532,11 @@
 					<span>1000</span>
 				</div>
 			</div>
+
+			<label class="input input-bordered flex w-full items-center justify-between">
+				<span>Show weight prediction</span>
+				<input type="checkbox" class="toggle toggle-success" bind:checked={form.showPrediction} />
+			</label>
 
 			{#if settingsSaved}
 				<div role="alert" class="alert alert-success">

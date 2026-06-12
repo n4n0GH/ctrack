@@ -25,7 +25,8 @@ const defaultSettings: UserSettings = {
 	highestWeight: 0,
 	gender: 'male',
 	deficit: 500,
-	goal: 'loss'
+	goal: 'loss',
+	showPrediction: true
 };
 
 /**
@@ -62,7 +63,9 @@ export const load = async () => {
 			highestWeight: athWeight.weight,
 			gender: fsettings.gender,
 			deficit: fsettings.deficit,
-			goal: resolveGoal(fsettings)
+			goal: resolveGoal(fsettings),
+			// Default on for records written before the toggle existed.
+			showPrediction: fsettings.showPrediction ?? true
 		};
 
 		pushTo.settings(newSettings);

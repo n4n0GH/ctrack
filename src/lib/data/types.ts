@@ -56,6 +56,8 @@ export type UserSettings = {
 	lowestWeight: number;
 	startingWeight: number;
 	goal: UserGoal;
+	/** Whether the predictive weight curve is shown on the weight chart. */
+	showPrediction: boolean;
 };
 
 export type CalorieSelector = 'calorieBurn' | 'calorieIntake';

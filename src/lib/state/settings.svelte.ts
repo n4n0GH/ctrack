@@ -10,5 +10,6 @@ export let settings = $state<UserSettings>({
 	highestWeight: 0,
 	gender: 'male',
 	deficit: 0,
-	goal: 'maintain'
+	goal: 'maintain',
+	showPrediction: true
 });

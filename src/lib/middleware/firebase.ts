@@ -112,7 +112,8 @@ export const updateUserSettings = async (settings: UserSettings) => {
 		height: settings.height,
 		deficit: settings.deficit,
 		startingWeight: settings.startingWeight,
-		goal: settings.goal
+		goal: settings.goal,
+		showPrediction: settings.showPrediction
 	};
 	try {
 		const settingsCol = collection(requireDb(), 'userSettings');

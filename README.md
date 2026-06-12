@@ -46,7 +46,10 @@ sit, and stats show total change, monthly average and current BMI. The three BMI
 lines adapt to you: they show the category boundaries surrounding your current
 BMI (derived from your weight and height), so they stay on-screen whether you're
 lean or heavy. You can also add your own custom reference lines (see
-**Settings**). Entries lazy-load as you scroll and can be edited inline.
+**Settings**). A muted **projection** line extends your recent trend (a
+least-squares fit over the last ~30 days) one month into the future, so you can
+see where your current pace is heading — toggle it off in **Settings** if you'd
+rather not. Entries lazy-load as you scroll and can be edited inline.
 
 > On mobile, the charts on the Calories and Weight pages shrink to half height
 > once you scroll down, so the data list gets more of the screen.
@@ -54,7 +57,8 @@ lean or heavy. You can also add your own custom reference lines (see
 ### Settings
 
 - Edit your profile: age, height, starting weight, gender, activity level, goal
-  (loss / gain / maintain) and daily deficit.
+  (loss / gain / maintain) and daily deficit. A **Show weight prediction** toggle
+  (on by default) controls the projection on the weight chart.
 - **Weight Graph Lines** — add, edit and remove your own horizontal reference
   lines on the weight chart (a goal weight, a population average, …). Each line
   has a label, a value in kg and a colour.
@@ -190,7 +194,7 @@ local-only mode (your local data is kept).
 
 - [x] Add Open Food Facts barcode lookup
       ([API](https://openfoodfacts.github.io/openfoodfacts-server/api/))
-- [ ] Generate a predictive weight curve projecting one month ahead
+- [x] Generate a predictive weight curve projecting one month ahead
 
 ## Attribution
 

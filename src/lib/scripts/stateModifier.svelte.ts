@@ -37,6 +37,7 @@ export const updateSettings = (newSettings: UserSettings) => {
 	settings.lowestWeight = newSettings.lowestWeight;
 	settings.startingWeight = newSettings.startingWeight;
 	settings.goal = newSettings.goal;
+	settings.showPrediction = newSettings.showPrediction;
 };
 
 /* == Weight Related == */

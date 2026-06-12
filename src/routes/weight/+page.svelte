@@ -117,13 +117,30 @@
 		(document.getElementById('weightEditModal') as HTMLDialogElement)?.showModal();
 	};
 	let chartData = $derived.by(() => {
-		return visibleWeights.map((weight) => {
+		const series = visibleWeights.map((weight) => {
 			return {
 				group: 'Weight',
 				date: new Date(weight.date.seconds * 1000).toISOString(),
 				value: weight.weight
 			};
 		});
+		// Append the predictive curve as a second series anchored to the latest
+		// weight, so it visually continues the line into the future.
+		if (projection) {
+			series.push(
+				{
+					group: 'Projection',
+					date: new Date(projection.startSeconds * 1000).toISOString(),
+					value: projection.startWeight
+				},
+				{
+					group: 'Projection',
+					date: new Date(projection.endSeconds * 1000).toISOString(),
+					value: projection.endWeight
+				}
+			);
+		}
+		return series;
 	});
 	let weightDiff = {
 		value: Math.round((settings.highestWeight - settings.currentWeight) * 10) / 10,
@@ -196,7 +213,68 @@
 		return Math.round((totalWeight / 100) * percentage * 10) / 10;
 	};
 
-	// TODO generate second weight curve with an averaged predictive curve 1 month into the future
+	// === Predictive weight curve ===
+	const PROJECTION_DAYS = 30; // how far ahead to project
+	const DAY = 86400; // seconds in a day
+
+	/**
+	 * Least-squares slope (kg per day) for the given time/weight points, or null
+	 * when a line can't be fit (fewer than two points, or no spread in time).
+	 */
+	const weightTrendPerDay = (points: { seconds: number; weight: number }[]): number | null => {
+		const n = points.length;
+		if (n < 2) return null;
+		// Express time in days relative to the first point to keep the sums small.
+		const t0 = points[0].seconds;
+		let sumX = 0;
+		let sumY = 0;
+		let sumXX = 0;
+		let sumXY = 0;
+		for (const p of points) {
+			const x = (p.seconds - t0) / DAY;
+			const y = p.weight;
+			sumX += x;
+			sumY += y;
+			sumXX += x * x;
+			sumXY += x * y;
+		}
+		const denominator = n * sumXX - sumX * sumX;
+		if (denominator === 0) return null; // all entries share one timestamp
+		return (n * sumXY - sumX * sumY) / denominator;
+	};
+
+	/**
+	 * A straight projection from the latest weight, extending the user's recent
+	 * trend PROJECTION_DAYS into the future. Uses the last 30 days of entries (or
+	 * the most recent handful when sparse) so it tracks current momentum rather
+	 * than ancient history. Null when there isn't enough data or the trend would
+	 * project to a non-positive weight (which the log axis can't plot).
+	 */
+	let projection = $derived.by(() => {
+		// Off when the user has disabled the prediction (default on for older records).
+		if (settings.showPrediction === false) return null;
+		if (weights.length < 2) return null;
+		const latest = weights[0]; // `weights` is sorted newest-first
+		const cutoff = latest.date.seconds - PROJECTION_DAYS * DAY;
+		let recent = weights.filter((w) => w.date.seconds >= cutoff);
+		if (recent.length < 2) recent = weights.slice(0, Math.min(weights.length, 10));
+
+		const points = recent
+			.map((w) => ({ seconds: w.date.seconds, weight: w.weight }))
+			.sort((a, b) => a.seconds - b.seconds);
+		const slope = weightTrendPerDay(points);
+		if (slope === null) return null;
+
+		const endWeight = Math.round((latest.weight + slope * PROJECTION_DAYS) * 10) / 10;
+		if (endWeight <= 0) return null;
+
+		return {
+			startSeconds: latest.date.seconds,
+			endSeconds: latest.date.seconds + PROJECTION_DAYS * DAY,
+			startWeight: latest.weight,
+			endWeight
+		};
+	});
 
 	// Derived so the chart re-renders at the reduced height once `chartHeight` changes.
 	let chartOptions = $derived({
@@ -224,7 +302,9 @@
 		},
 		color: {
 			scale: {
-				Weight: '#00bc7d'
+				Weight: '#00bc7d',
+				// Muted slate for the projection so it reads as an estimate, not data.
+				Projection: '#94a3b8'
 			}
 		},
 		legend: {
@@ -340,6 +420,30 @@
 					<div class="stat-value">{currentBmi}</div>
 					<div class="stat-desc">{getBmiLabel(currentBmi)}</div>
 				</div>
+
+				{#if projection}
+					<div class="md:stat hidden">
+						<div class="stat-figure text-secondary">
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke-width="1.5"
+								stroke="currentColor"
+								class="size-6"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"
+								/>
+							</svg>
+						</div>
+						<div class="stat-title">Projected</div>
+						<div class="stat-value">{projection.endWeight} KG</div>
+						<div class="stat-desc">In {PROJECTION_DAYS} Days</div>
+					</div>
+				{/if}
 			</div>
 		</div>
 	</div>

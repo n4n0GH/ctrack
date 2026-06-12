@@ -148,6 +148,7 @@ const initSettings = (
 		highestWeight: weights.ath,
 		gender: settings.gender,
 		deficit: settings.deficit,
-		goal: settings.goal
+		goal: settings.goal,
+		showPrediction: settings.showPrediction ?? true
 	};
 };
