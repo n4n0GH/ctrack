@@ -148,6 +148,39 @@
 
 	const currentBmi = getBmi(settings.currentWeight, settings.height);
 
+	// Standard WHO BMI category boundaries (kg/m²), with a colour ramp from lean
+	// (sky) to severe (dark red). BMI categories depend only on height, so each
+	// boundary's *weight* is derived from settings.height; which three are shown
+	// is chosen per user below.
+	const BMI_GUIDES = [
+		{ bmi: 18.5, color: '#0ea5e9' },
+		{ bmi: 25, color: '#fd9a00' },
+		{ bmi: 30, color: '#ff6900' },
+		{ bmi: 35, color: '#fb2c36' },
+		{ bmi: 40, color: '#c10007' }
+	];
+
+	/**
+	 * Returns the three BMI category boundaries surrounding the user's current BMI
+	 * so the guide lines stay relevant (and on-screen on the log axis) whether the
+	 * user is lean or heavy, instead of a fixed 25/30/35. The line's weight value
+	 * is still derived from height.
+	 */
+	const bmiGuideLines = (currentWeight: number, height: number) => {
+		const bmi = getBmi(currentWeight, height);
+		// First boundary at or above the current BMI; none means above the top band.
+		let upper = BMI_GUIDES.findIndex((guide) => guide.bmi >= bmi);
+		if (upper === -1) upper = BMI_GUIDES.length;
+		// Window the boundary just below the user through the next two, clamped so
+		// the slice always yields three entries.
+		const start = Math.min(Math.max(upper - 1, 0), BMI_GUIDES.length - 3);
+		return BMI_GUIDES.slice(start, start + 3).map((guide) => ({
+			value: getBmiThreshold(guide.bmi, height),
+			label: 'BMI ' + guide.bmi + ' - ' + getBmiLabel(guide.bmi),
+			fillColor: guide.color
+		}));
+	};
+
 	const getFatColor = (fat: number) => {
 		const label = getFatLevel(fat, settings.age, settings.gender);
 		return label === 'Obese'
@@ -173,21 +206,9 @@
 				includeZero: false,
 				scaleType: ScaleTypes.LOG,
 				thresholds: [
-					{
-						value: getBmiThreshold(35, settings.height),
-						label: 'BMI 35 - ' + getBmiLabel(35),
-						fillColor: '#fb2c36'
-					},
-					{
-						value: getBmiThreshold(30, settings.height),
-						label: 'BMI 30 - ' + getBmiLabel(30),
-						fillColor: '#ff6900'
-					},
-					{
-						value: getBmiThreshold(25, settings.height),
-						label: 'BMI 25 - ' + getBmiLabel(25),
-						fillColor: '#fd9a00'
-					},
+					// BMI category boundaries surrounding the user's current BMI, derived
+					// from their weight + height (recomputed reactively as settings change).
+					...bmiGuideLines(settings.currentWeight, settings.height),
 					// User-defined reference lines, managed on the settings page.
 					...weightSettings.map((line) => ({
 						value: line.value,
