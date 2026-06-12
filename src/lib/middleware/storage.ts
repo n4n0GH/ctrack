@@ -10,6 +10,7 @@ import { browser } from '$app/environment';
 import * as fb from '$lib/middleware/firebase';
 import * as idb from '$lib/middleware/idb';
 import * as off from '$lib/middleware/offFoodFacts';
+import * as quotes from '$lib/middleware/quotes';
 import type {
 	CalorieSelector,
 	EnergyItem,
@@ -18,6 +19,7 @@ import type {
 	UserSettings,
 	WeightSettingItem,
 	FoodProduct,
+	QuoteOfTheDay,
 	OutboxOperation
 } from '$lib/data/types';
 
@@ -223,6 +225,45 @@ export const lookupFood = async (barcode: string): Promise<FoodProduct | null> =
 	} catch (e) {
 		console.warn('Open Food Facts lookup failed:', e);
 		return null;
+	}
+};
+
+// ======================== Quote of the day ========================
+
+const QUOTE_TTL_MS = 24 * 60 * 60 * 1000; // refetch at most once per 24h
+
+/**
+ * Returns the motivational quote of the day. The quote is fetched at most once
+ * per 24h: a cached quote younger than the TTL is returned as-is; otherwise a
+ * fresh one is fetched and stored with a new timestamp. Never throws — if the
+ * fetch fails, any cached quote (even a stale one) is returned, else null.
+ */
+export const getDailyQuote = async (): Promise<QuoteOfTheDay | null> => {
+	if (!browser) return null;
+
+	let cached: QuoteOfTheDay | null = null;
+	try {
+		cached = await idb.getQuoteOfTheDay();
+	} catch (e) {
+		console.warn('Quote cache read failed:', e);
+	}
+
+	// Fresh enough — serve the cached quote without hitting the network.
+	if (cached && Date.now() - cached.fetchedAt < QUOTE_TTL_MS) return cached;
+
+	try {
+		const { quote, author } = await quotes.fetchQuote();
+		const fresh: QuoteOfTheDay = { quote, author, fetchedAt: Date.now() };
+		try {
+			await idb.saveQuoteOfTheDay(fresh);
+		} catch (e) {
+			console.warn('Quote cache write failed:', e);
+		}
+		return fresh;
+	} catch (e) {
+		console.warn('Quote fetch failed:', e);
+		// Fall back to the stale cached quote rather than showing nothing.
+		return cached;
 	}
 };
 

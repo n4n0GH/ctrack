@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import Container from '$lib/components/Container.svelte';
 	import RadialProgress from '$lib/components/RadialProgress.svelte';
 	import CalorieInput from '$lib/components/CalorieInput.svelte';
@@ -7,7 +8,15 @@
 	import { calories } from '$lib/state/calories.svelte';
 	import { getAgeFactor } from '$lib/scripts/helpers';
 	import { calorieGoal, usedCalories, deficitReduction } from '$lib/scripts/calories';
-	import type { ModalSelector } from '$lib/data/types';
+	import { getDailyQuote } from '$lib/middleware/storage';
+	import type { ModalSelector, QuoteOfTheDay } from '$lib/data/types';
+
+	// Quote of the day — fetched at most once per 24h, cached locally (see
+	// getDailyQuote). Loaded on mount so the network call never blocks render.
+	let quote = $state<QuoteOfTheDay | null>(null);
+	onMount(async () => {
+		quote = await getDailyQuote();
+	});
 
 	const ageFactor = getAgeFactor(settings.gender);
 
@@ -134,4 +143,17 @@
 			<button>close</button>
 		</form>
 	</dialog>
+
+	<Container title="QOTD">
+		<div class="card bg-base-100 mb-4 w-full px-6 py-4 shadow md:mx-4">
+			{#if quote}
+				<figure>
+					<blockquote class="text-lg leading-relaxed italic">“{quote.quote}”</blockquote>
+					<figcaption class="mt-3 text-right text-current/70">— {quote.author}</figcaption>
+				</figure>
+			{:else}
+				<p class="text-center text-current/50">Fetching a little motivation…</p>
+			{/if}
+		</div>
+	</Container>
 </div>

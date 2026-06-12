@@ -11,6 +11,7 @@ import type {
 	UserSettings,
 	WeightSettingItem,
 	FoodProduct,
+	QuoteOfTheDay,
 	OutboxOperation,
 	OutboxEntry,
 	FirebaseConfig
@@ -22,7 +23,8 @@ const DB_NAME = 'ctrack-db';
 // v4: firebaseConfig store holding the user-supplied Firebase identifiers.
 // v5: weightSettings store holding the weight-chart reference lines.
 // v6: foodCache store holding Open Food Facts lookups, keyed by barcode.
-const DB_VERSION = 6;
+// v7: quoteOfTheDay store holding the cached daily motivational quote.
+const DB_VERSION = 7;
 
 // Collection names matching Firebase
 const STORES = {
@@ -48,6 +50,11 @@ const CONFIG_KEY = 'config';
 // so a data sync/clear never wipes it, and excluded from backups since it is a
 // regenerable cache, not user data.
 const FOOD_CACHE_STORE = 'foodCache';
+
+// Holds the single cached "quote of the day" record (keyed under QUOTE_KEY).
+// Like the other caches it is kept out of STORES and out of backups.
+const QUOTE_STORE = 'quoteOfTheDay';
+const QUOTE_KEY = 'qotd';
 
 type StoreName = (typeof STORES)[keyof typeof STORES];
 
@@ -92,6 +99,10 @@ const openDb = (): Promise<IDBDatabase> => {
 			// Open Food Facts lookup cache, keyed by the product barcode.
 			if (!db.objectStoreNames.contains(FOOD_CACHE_STORE)) {
 				db.createObjectStore(FOOD_CACHE_STORE, { keyPath: 'barcode' });
+			}
+			// Single-record cache for the daily quote (keyed by an inline `id`).
+			if (!db.objectStoreNames.contains(QUOTE_STORE)) {
+				db.createObjectStore(QUOTE_STORE, { keyPath: 'id' });
 			}
 		};
 
@@ -510,6 +521,44 @@ export const putCachedFood = async (product: FoodProduct): Promise<void> => {
 	});
 };
 
+// ==================== QUOTE OF THE DAY ====================
+
+/**
+ * Returns the cached daily quote, or null when none is stored yet.
+ */
+export const getQuoteOfTheDay = async (): Promise<QuoteOfTheDay | null> => {
+	if (!browser) return null;
+	const db = await openDb();
+	const tx = db.transaction(QUOTE_STORE, 'readonly');
+	const request = tx.objectStore(QUOTE_STORE).get(QUOTE_KEY);
+	return new Promise((resolve, reject) => {
+		request.onsuccess = () => {
+			const result = request.result as (QuoteOfTheDay & { id: string }) | undefined;
+			if (!result) {
+				resolve(null);
+				return;
+			}
+			const { id: _id, ...quote } = result;
+			resolve(quote);
+		};
+		request.onerror = () => reject(request.error);
+	});
+};
+
+/**
+ * Stores the daily quote (overwriting any previous one).
+ */
+export const saveQuoteOfTheDay = async (quote: QuoteOfTheDay): Promise<void> => {
+	if (!browser) return;
+	const db = await openDb();
+	const tx = db.transaction(QUOTE_STORE, 'readwrite');
+	tx.objectStore(QUOTE_STORE).put({ id: QUOTE_KEY, ...quote });
+	return new Promise((resolve, reject) => {
+		tx.oncomplete = () => resolve();
+		tx.onerror = () => reject(tx.error);
+	});
+};
+
 // ==================== BACKUP / RESTORE ====================
 
 /**
@@ -540,9 +589,9 @@ export const exportDatabase = async (): Promise<BackupFile> => {
 
 	const db = await openDb();
 	for (const name of Array.from(db.objectStoreNames)) {
-		// The Firebase config is device-specific connection state and the food
-		// cache is regenerable, so neither belongs in a portable backup.
-		if (name === CONFIG_STORE || name === FOOD_CACHE_STORE) continue;
+		// The Firebase config is device-specific connection state; the food cache
+		// and daily quote are regenerable. None belong in a portable backup.
+		if (name === CONFIG_STORE || name === FOOD_CACHE_STORE || name === QUOTE_STORE) continue;
 		base.stores[name] = await new Promise<unknown[]>((resolve, reject) => {
 			const tx = db.transaction(name, 'readonly');
 			const request = tx.objectStore(name).getAll();

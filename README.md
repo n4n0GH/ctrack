@@ -22,6 +22,8 @@ A dashboard showing today at a glance:
 - **Weight** — your latest weight plus all-time-high / all-time-low and current
   goal mode.
 - Quick **Add** (intake), **Burn** (exercise) and **Update** (weight) actions.
+- **QOTD** — a motivational quote of the day, fetched at most once every 24h and
+  cached locally.
 
 ### Calories
 

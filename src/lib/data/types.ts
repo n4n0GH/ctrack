@@ -63,6 +63,17 @@ export type UserSettings = {
 export type CalorieSelector = 'calorieBurn' | 'calorieIntake';
 
 /**
+ * The cached "quote of the day". Fetched at most once per 24h and stored locally
+ * (never synced or backed up); `fetchedAt` is a millisecond timestamp used to
+ * decide when a fresh quote is due.
+ */
+export type QuoteOfTheDay = {
+	quote: string;
+	author: string;
+	fetchedAt: number;
+};
+
+/**
  * A food product looked up from Open Food Facts by barcode, normalised to just
  * the fields the calorie logger needs. Energy is per 100 g (OFF's canonical
  * unit); the optional serving fields are used to pre-fill a sensible portion.
