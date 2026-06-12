@@ -2,6 +2,7 @@ import { settings } from '$lib/state/settings.svelte';
 import { userWeights } from '$lib/state/weight.svelte';
 import { calories } from '$lib/state/calories.svelte';
 import { activity } from '$lib/state/activityHistory.svelte';
+import { findNewestWeight, findHighestWeight, findLowestWeight } from '$lib/scripts/helpers';
 import type { UserSettings, WeightItem, EnergyItem, ActivityHistoryItem } from '$lib/data/types';
 import type { DocumentData } from 'firebase/firestore';
 
@@ -33,8 +34,18 @@ export const updateSettings = (newSettings: UserSettings) => {
 
 /* == Weight Related == */
 
+// The home page reads the current/highest/lowest weight off `settings`, which is
+// seeded from the weight history at boot (see +layout.ts). Re-derive those tiers
+// whenever the history changes so the displayed values stay reactive.
+const syncWeightTiers = () => {
+	settings.currentWeight = findNewestWeight(userWeights).weight;
+	settings.highestWeight = findHighestWeight(userWeights).weight;
+	settings.lowestWeight = findLowestWeight(userWeights).weight;
+};
+
 export const addUserWeight = (newWeight: WeightItem) => {
 	userWeights.push(newWeight);
+	syncWeightTiers();
 };
 
 export const initUserWeight = (dataset: (WeightItem | DocumentData)[]) => {
@@ -49,6 +60,7 @@ export const updateWeightItem = (updatedItem: WeightItem) => {
 	);
 	if (index !== -1) {
 		userWeights[index] = { ...userWeights[index], ...updatedItem };
+		syncWeightTiers();
 	}
 };
 
